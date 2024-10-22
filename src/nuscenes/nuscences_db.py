@@ -456,6 +456,7 @@ class NuScenesDB:
         return token
 
     def add_visibility(self, *,
+                       token: str = None,
                        description: str,
                        level: str) -> str:
         """增加一条 visibility 记录
@@ -467,7 +468,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = token or self._get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO visibility (token, description, level) VALUES (?, ?, ?)
