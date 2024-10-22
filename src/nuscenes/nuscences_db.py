@@ -412,6 +412,7 @@ class NuScenesDB:
         return token
     
     def add_sample_data(self, *,
+                        token: str,
                         sample_token: str,
                         ego_pose_token: str,
                         calibrated_sensor_token: str,
@@ -425,6 +426,7 @@ class NuScenesDB:
         """增加一条 sample_data 记录
 
         Args:
+            token (str, optional): 需要与 ego_pose 表中的 token 一致, 由外部程序确保一致性
             sample_token (str): 指向的 sample 记录的 token
             ego_pose_token (str): 指向的 ego_pose 记录的 token
             calibrated_sensor_token (str): 指向的 calibrated_sensor 记录的 token
