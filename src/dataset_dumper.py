@@ -126,4 +126,5 @@ class DatasetDumper(ABC):
         
         # 完成数据写入后，清除事件
         for bind in self.binds:
-            bind.sensor.on_data_ready.clear()
+            if isinstance(bind, self.SensorBind):
+                bind.actor.on_data_ready.clear()
