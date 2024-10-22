@@ -32,7 +32,7 @@ class NuScenesDB:
             # raise FileExistsError(f"File {self._db_path} already exists")
         
         # 创建数据库
-        conn = sqlite3.connect(self._db_path)
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
         cursor = conn.cursor()
 
         return conn, cursor
