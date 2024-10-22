@@ -478,11 +478,13 @@ class NuScenesDB:
         return token
     
     def add_attribute(self, *,
-                      name: str) -> str:
+                      name: str,
+                      description: str = 'NOT_SET') -> str:
         """增加一条 attribute 记录
 
         Args:
             name (str): 属性名称, 如: 'car'.
+            description (str, optional): 属性描述, 默认为 'NOT_SET'.
 
         Returns:
             str: 插入数据库的 token
@@ -490,8 +492,8 @@ class NuScenesDB:
         token = self._get_nuscenes_token()
         
         self._cursor.execute('''
-            INSERT INTO attribute (token, name) VALUES (?, ?)
-        ''', (token, name))
+            INSERT INTO attribute (token, name, description) VALUES (?, ?, ?)
+        ''', (token, name, description))
         
         self._conn.commit()
         return token
