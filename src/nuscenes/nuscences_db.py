@@ -15,10 +15,10 @@ class NuScenesDB:
         # 初始化表
         self._create_tables()
         
-    def _get_nuscenes_token(self) -> str:
+    def get_nuscenes_token(self) -> str:
         return str(uuid.uuid4().hex)
     
-    def _get_nuscenes_timestamp(self, timestamp: float) -> int:
+    def get_nuscenes_timestamp(self, timestamp: float) -> int:
         return int(timestamp * 1_000_000)   
 
     def _decode_json_list(self, json_str: str) -> List[float]:
@@ -239,7 +239,7 @@ class NuScenesDB:
         Returns:
             str: _description_
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         log_file = f"{vehicle}-{dtime.strftime('%Y-%m-%d-%H-%M-%S%z')}"
         date_captured = dtime.strftime("%Y-%m-%d")
         
@@ -268,7 +268,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO map (token, category, filename) VALUES (?, ?, ?)
@@ -291,7 +291,7 @@ class NuScenesDB:
         Returns: 
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO scene (token, log_token, name, description) VALUES (?, ?, ?, ?)
@@ -314,9 +314,9 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         # 将时间戳转换为微秒, 与 nuScence 定义一致
-        timestamp = self._get_nuscenes_timestamp(timestamp)
+        timestamp = self.get_nuscenes_timestamp(timestamp)
         
         # 记录新值
         self._cursor.execute('''
@@ -343,7 +343,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO sensor (token, channel, modality) VALUES (?, ?, ?)
@@ -368,7 +368,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         # 转换部分数据为 json 格式
         translation = json.dumps(translation)
@@ -398,7 +398,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        timestamp = self._get_nuscenes_timestamp(timestamp)
+        timestamp = self.get_nuscenes_timestamp(timestamp)
         
         # 转换部分数据为 json 格式
         translation = json.dumps(translation)
@@ -441,7 +441,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        timestamp = self._get_nuscenes_timestamp(timestamp)
+        timestamp = self.get_nuscenes_timestamp(timestamp)
         
         # 记录新值
         self._cursor.execute('''
@@ -470,7 +470,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = token or self._get_nuscenes_token()
+        token = token or self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO visibility (token, description, level) VALUES (?, ?, ?)
@@ -491,7 +491,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO attribute (token, name, description) VALUES (?, ?, ?)
@@ -512,7 +512,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO category (token, name, description) VALUES (?, ?, ?)
@@ -532,7 +532,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         self._cursor.execute('''
             INSERT INTO instance (token, name, first_annotation_token, last_annotation_token) VALUES (?, ?, ?, ?)
@@ -569,7 +569,7 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
+        token = self.get_nuscenes_token()
         
         # 转换部分数据为 json 格式
         translation = json.dumps(translation)
