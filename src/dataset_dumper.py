@@ -91,10 +91,12 @@ class DatasetDumper(ABC):
         offset = 1
         if os.path.exists(self.current_sequence_path) and os.listdir(self.current_sequence_path):
             self.logger.warning(f"Sequence directory already exists: {self._current_sequence_name}")
-            while os.path.exists(self.current_sequence_path):
-                self._current_sequence_name = f"{self._current_sequence_name}_{offset}"
+            # 如果序列目录存在，则重命名序列目录
+            while os.path.exists(os.path.join(self._root_path, f'{self._current_sequence_name}_{offset}')):
+                self.logger.debug(f"Trying to rename sequence directory to but it already exists: {self._current_sequence_name}_{offset}")
                 offset += 1
             else:
+                self._current_sequence_name = f'{self._current_sequence_name}_{offset}'
                 self.logger.warning(f"Sequence name changed to: {self._current_sequence_name} due to name conflict")
         
         # 创建序列目录
