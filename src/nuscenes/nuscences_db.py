@@ -815,3 +815,16 @@ class NuScenesDB:
             result.append(row_dict)
         
         return json.dumps(result)
+
+    def dump_category(self) -> str:
+        """导出 category 表为 json 格式
+
+        Returns:
+            str: json 格式的 category 表, 与 nuScence 定义一致
+        """
+        self._cursor.execute('''
+            SELECT * FROM category
+        ''')
+        rows = self._cursor.fetchall()
+        columns = [column[0] for column in self._cursor.description]
+        return json.dumps([dict(zip(columns, row)) for row in rows])
