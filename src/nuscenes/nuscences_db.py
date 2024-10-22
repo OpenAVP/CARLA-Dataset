@@ -441,7 +441,6 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
         timestamp = self._get_nuscenes_timestamp(timestamp)
         
         # 记录新值
