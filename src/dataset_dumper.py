@@ -7,16 +7,22 @@ from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from contextlib import contextmanager
 
 from packages.carla1s.utils.logging import get_logger
-from packages.carla1s.actors import Sensor
+from packages.carla1s.actors import Sensor, Actor
 
 
 
 class DatasetDumper(ABC):
     
     @dataclass
-    class SensorBind:
-        """绑定一个传感器至具体的任务"""
-        sensor: Sensor
+    class Bind:
+        """绑定一个 Actor 至一个或多个任务"""
+        actor: Actor
+        
+    @dataclass
+    class SensorBind(Bind):
+        """绑定一个 Sensor 至一个或多个任务, 多用于储存数据或计算位姿关系"""
+        actor: Sensor
+        sensor: Sensor = None  # TODO: 兼容设置, 后续移除
     
     def __init__(self, root_path: str, max_workers: int = 3):
         # PRIVATE
