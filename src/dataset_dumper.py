@@ -87,12 +87,15 @@ class DatasetDumper(ABC):
         Args:
             path (str): 序列目录路径.
         """
-        # 如果序列目录已经存在，并且包含内容，则抛出异常
-        if os.path.exists(self.current_sequence_path):
-            if os.listdir(self.current_sequence_path):
-                raise FileExistsError(f"Sequence directory already exists and contains files: {self._current_sequence_name}")
+        # 如果序列目录已经存在，并且包含内容，则重命名序列目录
+        offset = 1
+        if os.path.exists(self.current_sequence_path) and os.listdir(self.current_sequence_path):
+            self.logger.warning(f"Sequence directory already exists: {self._current_sequence_name}")
+            while os.path.exists(self.current_sequence_path):
+                self._current_sequence_name = f"{self._current_sequence_name}_{offset}"
+                offset += 1
             else:
-                self.logger.warning(f"Sequence directory already exists but is empty: {self._current_sequence_name}")
+                self.logger.warning(f"Sequence name changed to: {self._current_sequence_name} due to name conflict")
         
         # 创建序列目录
         os.makedirs(self.current_sequence_path)
