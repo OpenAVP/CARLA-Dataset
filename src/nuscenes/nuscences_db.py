@@ -383,12 +383,14 @@ class NuScenesDB:
         return token
     
     def add_ego_pose(self, *,
+                     token: str,
                      timestamp: float = time.time(),
                      translation: List[float],
                      rotation: List[float]) -> str:
         """增加一条 ego_pose 记录
 
         Args:
+            token (str, optional): 需要与 sample_data 表中的 token 一致
             timestamp (float, optional): 时间戳, 采用标准 Unix 时间戳, 单位为秒, 默认使用当前时间戳
             translation (list[float]): 平移向量
             rotation (list[float]): 旋转矩阵
@@ -396,7 +398,6 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """
-        token = self._get_nuscenes_token()
         timestamp = self._get_nuscenes_timestamp(timestamp)
         
         # 转换部分数据为 json 格式
