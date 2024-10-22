@@ -41,6 +41,10 @@ class DatasetDumper(ABC):
         return self._binds
 
     @property
+    def current_sequence_name(self) -> str:
+        return self._current_sequence_name
+
+    @property
     def current_frame_name(self) -> str:
         return str(self._current_frame_count)
 
