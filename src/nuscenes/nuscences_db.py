@@ -224,7 +224,7 @@ class NuScenesDB:
         ''')
 
     def add_log(self, *,
-                datatime: datetime.datetime = datetime.datetime.now(),
+                dtime: datetime.datetime = datetime.datetime.now(),
                 vehicle: str = 'UNKNOW', 
                 location: str = 'UNKNOW',
                 map_token: str) -> str:
@@ -232,7 +232,7 @@ class NuScenesDB:
 
         Args:
             map_token (str): 指向的 map 记录的 token
-            datatime (datetime.datetime, optional): 数据采集的时间. 默认使用当前时间.
+            dtime (datetime.datetime, optional): 数据采集的时间. 默认使用当前时间.
             vehicle (str, optional): 采集数据时所用到的车辆描述, 如: 'n18'. 默认为 'UNKNOW'.
             location (str, optional): 数据采集的地点描述. 如: 'singapore-onenorth'. 默认为 'UNKNOW'.
 
@@ -240,8 +240,8 @@ class NuScenesDB:
             str: _description_
         """
         token = self._get_nuscenes_token()
-        log_file = f"{vehicle}-{datatime.strftime('%Y-%m-%d-%H-%M-%S%z')}"
-        date_captured = datatime.strftime("%Y-%m-%d")
+        log_file = f"{vehicle}-{dtime.strftime('%Y-%m-%d-%H-%M-%S%z')}"
+        date_captured = dtime.strftime("%Y-%m-%d")
         
         # 记录 log 数据
         self._cursor.execute('''
