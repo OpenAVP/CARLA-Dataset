@@ -4,8 +4,9 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Set
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from contextlib import contextmanager
 
-from packages.carla1s.utils import get_logger
+from packages.carla1s.utils.logging import get_logger
 from packages.carla1s.actors import Sensor
 
 
@@ -13,9 +14,9 @@ from packages.carla1s.actors import Sensor
 class DatasetDumper(ABC):
     
     @dataclass
-    class SensorTargetPair:
+    class SensorBind:
+        """绑定一个传感器至具体的任务"""
         sensor: Sensor
-        data_path: str
     
     def __init__(self, root_path: str, max_workers: int = 3):
         # PRIVATE
@@ -56,6 +57,7 @@ class DatasetDumper(ABC):
         return set(bind.sensor for bind in self.binds)
 
     @abstractmethod
+    @contextmanager
     def create_sequence(self, name: str = None):
         """创建一个新的序列.
 

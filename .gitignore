@@ -8,3 +8,7 @@ venv/
 # 忽略 IDE 设置
 .vscode/
 .idea/
+
+# 忽略 temp 文件夹下的所有文件
+temp/*
+!temp/.gitkeep

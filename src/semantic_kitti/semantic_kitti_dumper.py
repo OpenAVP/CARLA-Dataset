@@ -1,48 +1,65 @@
 import os
 import cv2
 import numpy as np
+import copy
 from dataclasses import dataclass
 from typing import Optional
+from contextlib import contextmanager
 
 from packages.carla1s.actors import Sensor
-from packages.carla1s.tf import Point, CoordConverter, Transform
+from packages.carla1s.tf import Point, CoordConverter, Transform, Coordinate
 
 from ..dataset_dumper import DatasetDumper
 
 class SemanticKittiDumper(DatasetDumper):
     
     @dataclass
-    class SemanticLidarTargetPair(DatasetDumper.SensorTargetPair):
-        label_path: str
+    class SemanticLidarBind(DatasetDumper.SensorBind):
+        """绑定语义激光雷达至输出点云和标签文件夹路径"""
+        data_path: str
+        labels_path: str
         
     @dataclass
-    class TimestampTargetPair(DatasetDumper.SensorTargetPair):
-        pass
+    class TimestampBind(DatasetDumper.SensorBind):
+        """绑定时间戳至文件路径"""
+        data_path: str
     
     @dataclass
-    class PoseTargetPair(DatasetDumper.SensorTargetPair):
-        pass
+    class PoseBind(DatasetDumper.SensorBind):
+        """绑定位姿至文件路径"""
+        data_path: str
     
     @dataclass
-    class ImageTargetPair(DatasetDumper.SensorTargetPair):
-        pass
+    class ImageBind(DatasetDumper.SensorBind):
+        """绑定图像至输出文件夹路径"""
+        data_path: str
     
     @dataclass
-    class CalibTargetPair(DatasetDumper.SensorTargetPair):
-        pass
+    class CalibTrBind(DatasetDumper.SensorBind):
+        """绑定标定数据至文件路径"""
+        data_path: str
     
-    def __init__(self, root_path: str, max_workers: int = 3):
+    def __init__(self, 
+                 root_path: str, 
+                 *,
+                 max_workers: int = 3):
         super().__init__(root_path, max_workers)
         self._timestamp_offset: Optional[float] = None
         self._pose_offset: Optional[Transform] = None
+        self._pose_offset_coordinate: Optional[Coordinate] = None
     
     @property
     def current_frame_name(self) -> str:
+        """当前帧的名称, 格式为 6 位数字, 不足 6 位则补 0"""
         return f'{self._current_frame_count:06d}'
 
+    @contextmanager
     def create_sequence(self, name: str = None):
         super().create_sequence(name)
         self._setup_content_folder()
+        self.logger.info("=> SEQUENCE BEGINS ".ljust(80, '='))
+        yield
+        self.logger.info("=> SEQUENCE ENDS ".ljust(80, '='))
 
     def create_frame(self) -> 'SemanticKittiDumper':
         # 遍历所有的 bind, 创建 dump 任务
@@ -56,39 +73,55 @@ class SemanticKittiDumper(DatasetDumper):
             self._setup_calib_file()
 
         for bind in self.binds:
-            if isinstance(bind, self.SemanticLidarTargetPair):
+            if isinstance(bind, self.SemanticLidarBind):
                 self._promises.append(self.thread_pool.submit(self._dump_semantic_lidar, bind))
-            elif isinstance(bind, self.ImageTargetPair):
+            elif isinstance(bind, self.ImageBind):
                 self._promises.append(self.thread_pool.submit(self._dump_image, bind))
-            elif isinstance(bind, self.TimestampTargetPair):
+            elif isinstance(bind, self.TimestampBind):
                 self._promises.append(self.thread_pool.submit(self._dump_timestamp, bind))
-            elif isinstance(bind, self.PoseTargetPair):
+            elif isinstance(bind, self.PoseBind):
                 self._promises.append(self.thread_pool.submit(self._dump_pose, bind))
 
         return self
     
-    def bind_camera(self, sensor: Sensor, data_path: str) -> 'DatasetDumper':
-        self._binds.append(self.ImageTargetPair(sensor, data_path))
+    def bind_camera(self, 
+                    sensor: Sensor, 
+                    *,
+                    data_folder: str) -> 'DatasetDumper':
+        self._binds.append(self.ImageBind(sensor, data_folder))
         return self
 
-    def bind_semantic_lidar(self, sensor: Sensor, data_path: str, label_path: str) -> 'DatasetDumper':
-        self._binds.append(self.SemanticLidarTargetPair(sensor, data_path, label_path))
+    def bind_semantic_lidar(self, 
+                            sensor: Sensor, 
+                            *,
+                            data_folder: str, 
+                            labels_folder: str) -> 'DatasetDumper':
+        self._binds.append(self.SemanticLidarBind(sensor, data_folder, labels_folder))
         return self
 
-    def bind_timestamp(self, sensor: Sensor, path: str):
-        if os.path.splitext(path)[1] == '':
-            raise ValueError(f"Path {path} is a folder, not a file.")
-        self.binds.append(self.TimestampTargetPair(sensor, path))
+    def bind_timestamp(self, 
+                       sensor: Sensor, 
+                       *,
+                       file_path: str) -> 'DatasetDumper':
+        if os.path.splitext(file_path)[1] == '':
+            raise ValueError(f"Path {file_path} is a folder, not a file.")
+        self.binds.append(self.TimestampBind(sensor, file_path))
         
-    def bind_pose(self, sensor: Sensor, path: str):
-        if os.path.splitext(path)[1] == '':
-            raise ValueError(f"Path {path} is a folder, not a file.")
-        self.binds.append(self.PoseTargetPair(sensor, path))
+    def bind_pose(self, 
+                  sensor: Sensor, 
+                  *,
+                  file_path: str) -> 'DatasetDumper':
+        if os.path.splitext(file_path)[1] == '':
+            raise ValueError(f"Path {file_path} is a folder, not a file.")
+        self.binds.append(self.PoseBind(sensor, file_path))
         
-    def bind_calib(self, sensor: Sensor, path: str):
-        if os.path.splitext(path)[1] == '':
-            raise ValueError(f"Path {path} is a folder, not a file.")
-        self.binds.append(self.CalibTargetPair(sensor, path))
+    def bind_calib(self, 
+                   *, 
+                   tr_sensor: Sensor, 
+                   file_path: str) -> 'DatasetDumper':
+        if os.path.splitext(file_path)[1] == '':
+            raise ValueError(f"Path {file_path} is a folder, not a file.")
+        self.binds.append(self.CalibTrBind(tr_sensor, file_path))
 
     def _setup_content_folder(self):
         """创建内容文件夹."""
@@ -102,22 +135,22 @@ class SemanticKittiDumper(DatasetDumper):
                     f.write('')
                     self.logger.info(f"Created file at: {os.path.join(self.current_sequence_path, bind.data_path)}")
             # 处理特殊项
-            if isinstance(bind, self.SemanticLidarTargetPair):
-                os.makedirs(os.path.join(self.current_sequence_path, bind.label_path))
-                self.logger.info(f"Created label path: {os.path.join(self.current_sequence_path, bind.label_path)}")
+            if isinstance(bind, self.SemanticLidarBind):
+                os.makedirs(os.path.join(self.current_sequence_path, bind.labels_path))
+                self.logger.info(f"Created labels path: {os.path.join(self.current_sequence_path, bind.labels_path)}")
 
     def _setup_calib_file(self):
         """创建标定文件."""
         # 寻找 calib bind 和 pose bind
-        calib_bind = next((bind for bind in self.binds if isinstance(bind, self.CalibTargetPair)), None)
-        pose_bind = next((bind for bind in self.binds if isinstance(bind, self.PoseTargetPair)), None)
+        calib_bind = next((bind for bind in self.binds if isinstance(bind, self.CalibTrBind)), None)
+        pose_bind = next((bind for bind in self.binds if isinstance(bind, self.PoseBind)), None)
         
         if calib_bind is None or pose_bind is None:
             raise ValueError("Calib bind or pose bind not found")
         
         self._promises.append(self.thread_pool.submit(self._dump_calib, calib_bind, pose_bind))
 
-    def _dump_image(self, bind: ImageTargetPair):
+    def _dump_image(self, bind: ImageBind):
         # 阻塞等待传感器更新
         bind.sensor.on_data_ready.wait()
         # 储存数据
@@ -127,38 +160,69 @@ class SemanticKittiDumper(DatasetDumper):
         # 打印日志
         self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped image to {path}")
 
-    def _dump_semantic_lidar(self, bind: SemanticLidarTargetPair):
+    def _dump_semantic_lidar(self, bind: SemanticLidarBind):
         # 阻塞等待传感器更新
         bind.sensor.on_data_ready.wait()
         
         # 准备储存路径
         file_name = f"{self.current_frame_name}"
         path_data = os.path.join(self.current_sequence_path, bind.data_path, file_name + '.bin')
-        path_label = os.path.join(self.current_sequence_path, bind.label_path, file_name + '.label')
+        path_labels = os.path.join(self.current_sequence_path, bind.labels_path, file_name + '.label')
         
         # 处理点云
-        points = [Point(x=x, y=y, z=z) for x, y, z in bind.sensor.data.content[:, :3]]
-        points = CoordConverter.from_system(*points).apply_transform(CoordConverter.TF_TO_KITTI).get_list()
+        points = [Point(x=x, y=-y, z=z) for x, y, z in bind.sensor.data.content[:, :3]]
+        points = CoordConverter.from_system(*points).get_list()
         points = np.array([[p.x, p.y, p.z, 1.0] for p in points], dtype=np.float32)
                 
         # 处理标注
         seg = bind.sensor.data.content[:, 3]
-        id = bind.sensor.data.content[:, 4]
-        labels = np.column_stack((seg.astype(np.uint16), id.astype(np.uint16)))
+        seg[seg == 1] = 40  # road - road
+        seg[seg == 2] = 48  # sidewalk - sidewalk
+        seg[seg == 3] = 50  # building - building
+        seg[seg == 4] = 52  # wall - other-structure
+        seg[seg == 5] = 51  # fence - fence
+        seg[seg == 6] = 80  # pole - pole
+        seg[seg == 7] = 99  # traffic light - other-object
+        seg[seg == 8] = 81  # traffic sign - traffic-sign
+        seg[seg == 9] = 70  # vegetation - vegetation
+        seg[seg == 10] = 72  # terrain - terrain
+        seg[seg == 11] = 0  # sky - unlabeled
+        seg[seg == 12] = 30  # pedestrian - person
+        seg[seg == 13] = 31  # rider - bicyclist
+        seg[seg == 14] = 10  # car - car
+        seg[seg == 15] = 18  # truck - truck
+        seg[seg == 16] = 13  # bus - bus
+        seg[seg == 17] = 16  # train - on-rails
+        seg[seg == 18] = 15  # motorcycle - motorcycle
+        seg[seg == 19] = 11  # bicycle - bicycle
+        seg[seg == 20] = 20  # static - outlier
+        seg[seg == 21] = 259  # dynamic - moving-other-vehicle
+        seg[seg == 22] = 99  # other - other-object
+        seg[seg == 23] = 49  # water - other-ground
+        seg[seg == 24] = 60  # road line - lane-marking
+        seg[seg == 25] = 49  # ground - other-ground
+        seg[seg == 26] = 52  # bridge - other-structure
+        seg[seg == 27] = 49  # rail - other-ground
+        seg[seg == 28] = 51  # guard rail - fence
+        seg[seg == 29] = 60  # lane-marking
+        seg[seg == 30] = 44  # parking
+
+        oid = bind.sensor.data.content[:, 4]
+        labels = np.column_stack((seg.astype(np.uint16), oid.astype(np.uint16)))
         
         # 储存数据
         points.tofile(path_data)
-        labels.tofile(path_label)
+        labels.tofile(path_labels)
         
         # 打印日志
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped pointcloud to {path_data}")
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped labels to {path_label}")
+        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped pointcloud(shape={points.shape}) to {path_data}")
+        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped labels(shape={labels.shape}) to {path_labels}")
 
-    def _dump_timestamp(self, bind: DatasetDumper.SensorTargetPair):
+    def _dump_timestamp(self, bind: DatasetDumper.SensorBind):
         """导出时间戳, 以秒为单位, 使用科学计数法, 保留小数点后 6 位.
 
         Args:
-            bind (DatasetDumper.SensorTargetPair): 参考的传感器绑定
+            bind (DatasetDumper.SensorBind): 参考的传感器绑定
         """
         bind.sensor.on_data_ready.wait()
         if self._timestamp_offset is None:
@@ -169,11 +233,11 @@ class SemanticKittiDumper(DatasetDumper):
             
         self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped timestamp to {os.path.join(self.current_sequence_path, bind.data_path)}, value: {timestamp:.6e}")
 
-    def _dump_pose(self, bind: PoseTargetPair):
+    def _dump_pose(self, bind: PoseBind):
         """导出位姿数据, 是 3x4 的变换矩阵, 表示当前帧参考传感器到初始帧参考传感器的位姿变换.
 
         Args:
-            bind (PoseTargetPair): 参考的传感器绑定
+            bind (PoseBind): 参考的传感器绑定
         """
         bind.sensor.on_data_ready.wait()
         
@@ -185,18 +249,18 @@ class SemanticKittiDumper(DatasetDumper):
         
         # 如果 offset 未设置, 则设置为当前帧的位姿
         if self._pose_offset is None:
-            self._pose_offset = pose
-        
-        # 计算当前帧的位姿相对初始帧的位姿
-        relative_pose = (CoordConverter
-                         .from_system(pose)
-                         .apply_transform(self._pose_offset)
-                         .apply_transform(CoordConverter.TF_TO_KITTI)
-                         .get_single())
+            self._pose_offset = copy.deepcopy(pose)
+            self._pose_offset_coordinate = Coordinate(self._pose_offset).change_orientation(CoordConverter.CARLA_CAM_TO_KITTI_CAM_ORIENTATION)
+
+        # # 计算当前帧的位姿相对初始帧的位姿
+
+        cami_on_cam0_kittiori_kitticoord = (Coordinate(pose)
+                                            .change_orientation(CoordConverter.CARLA_CAM_TO_KITTI_CAM_ORIENTATION)
+                                            .apply_transform(Transform(matrix=self._pose_offset_coordinate.data.matrix)))
         
         # 将位姿矩阵转换为 3x4 的变换矩阵
-        pose_matrix = relative_pose.matrix[:3, :]
-        
+        pose_matrix = cami_on_cam0_kittiori_kitticoord.data.matrix[:3, :]
+
         # 横向展开, 表示为 1x12 的行向量, 并处理为小数点后 6 位的科学计数法表示, 以空格分隔
         pose_matrix = pose_matrix.flatten()
         pose_matrix = [f"{value:.6e}" for value in pose_matrix]
@@ -207,7 +271,7 @@ class SemanticKittiDumper(DatasetDumper):
             f.write(f"{pose_matrix}\n")
         self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped pose to {path}")
 
-    def _dump_calib(self, bind_calib: CalibTargetPair, bind_pose: PoseTargetPair):
+    def _dump_calib(self, bind_calib: CalibTrBind, bind_pose: PoseBind):
         # 阻塞等待传感器更新
         bind_calib.sensor.on_data_ready.wait()
         bind_pose.sensor.on_data_ready.wait()
@@ -215,7 +279,7 @@ class SemanticKittiDumper(DatasetDumper):
         # 准备对象
         target = bind_calib.sensor
         cam_0 = bind_pose.sensor
-        other_cams = set(bind.sensor for bind in self.binds if isinstance(bind, self.ImageTargetPair) and bind.sensor != cam_0)
+        other_cams = set(bind.sensor for bind in self.binds if isinstance(bind, self.ImageBind) and bind.sensor != cam_0)
         # 确保cam_0在第一位
         cams = [cam_0] + list(other_cams)
         
@@ -234,25 +298,28 @@ class SemanticKittiDumper(DatasetDumper):
         def compute_projection_matrix(K, R, t):
             # extern matrix
             RT = np.hstack((R, t))
-            # project matrix P = K[R|t]
             P = np.dot(K, RT)
             return P
 
         # 处理相机
+        cam0_on_cam0_kittiori_carlacoord = (Coordinate(cam_0.data.transform)
+                                            .change_orientation(CoordConverter.CARLA_CAM_TO_KITTI_CAM_ORIENTATION))
         for idx, cam in enumerate(cams):
             # 获取内参
             image_width = int(cam.attributes['image_size_x'])
             image_height = int(cam.attributes['image_size_y'])
             fov = float(cam.attributes['fov'])
             
-            # print(f"image_width: {image_width}, image_height: {image_height}, fov: {fov}")
             
             K = compute_intrinsic_matrix(image_width, image_height, fov)
             
             # 获取外参
-            T = np.dot(np.linalg.inv(cam_0.data.transform.matrix), cam.data.transform.matrix)
-            R = T[:3, :3]
-            t = T[:3, -1].reshape(3, 1)
+            cam_on_cam0_kittiori_kitticoord = (Coordinate(cam.data.transform)
+                                               .change_orientation(CoordConverter.CARLA_CAM_TO_KITTI_CAM_ORIENTATION)
+                                               .apply_transform(Transform(matrix=cam0_on_cam0_kittiori_carlacoord.data.matrix)))
+
+            R = cam_on_cam0_kittiori_kitticoord.data.matrix[:3, :3]
+            t = cam_on_cam0_kittiori_kitticoord.data.matrix[:3, -1].reshape(3, 1)
             P = compute_projection_matrix(K, R, t)
             
             # 保存到文件
@@ -262,10 +329,14 @@ class SemanticKittiDumper(DatasetDumper):
                 calibfile.write(string + "\n")
                 self.logger.debug(f"[frame={cam.data.frame}] Dumped calib P{idx} to {path}")
         
-        # 处理最终目标
-        T = np.dot(np.linalg.inv(cam_0.data.transform.matrix), target.data.transform.matrix)
+        # 处理雷达到相机的变换
+        lidar_on_cam0_kittiori_kitticoord = (Coordinate(target.data.transform)
+                                             .change_orientation(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION)
+                                             .apply_transform(Transform(matrix=cam0_on_cam0_kittiori_carlacoord.data.matrix)))
+        Tr = lidar_on_cam0_kittiori_kitticoord.data.matrix
+
         with open(path, 'a') as calibfile:
             calibfile.write("Tr:")
-            string = ' '.join(['{:.12e}'.format(value) for row in T for value in row])
+            string = ' '.join(['{:.12e}'.format(value) for row in Tr[:3, :] for value in row])
             calibfile.write(string + "\n")
             self.logger.debug(f"[frame={bind_calib.sensor.data.frame}] Dumped calib Tr to {path}")
