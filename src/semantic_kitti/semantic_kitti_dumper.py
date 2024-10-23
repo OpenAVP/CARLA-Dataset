@@ -13,6 +13,7 @@ from ..dataset_dumper import DatasetDumper
 
 class SemanticKittiDumper(DatasetDumper):
     
+    MAPPING_SEG_KITTI_DEFAULT = 0 # unlabeled
     MAPPING_SEG_CARLA_TO_KITTI = {
         1: 40,   # road - road
         2: 48,   # sidewalk - sidewalk
@@ -209,7 +210,7 @@ class SemanticKittiDumper(DatasetDumper):
                 
         # 处理标注
         seg = bind.actor.data.content[:, 3]
-        seg = np.vectorize(self.MAPPING_SEG_CARLA_TO_KITTI.get)(seg)
+        seg = np.array([self.MAPPING_SEG_CARLA_TO_KITTI.get(i, self.MAPPING_SEG_KITTI_DEFAULT) for i in seg], dtype=np.uint16)
 
         oid = bind.actor.data.content[:, 4]
         labels = np.column_stack((seg.astype(np.uint16), oid.astype(np.uint16)))
