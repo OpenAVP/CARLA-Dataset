@@ -889,3 +889,10 @@ class NuScenesDB:
         rows = self._cursor.fetchall()
         columns = [column[0] for column in self._cursor.description]
         return json.dumps([dict(zip(columns, row)) for row in rows])
+
+    def get_category_token_by_index(self, index: int) -> str:
+        """根据 index 获取 category 表中的 token"""
+        self._cursor.execute('''
+            SELECT token FROM category WHERE index = ?
+        ''', (index,))
+        return self._cursor.fetchone()[0]
