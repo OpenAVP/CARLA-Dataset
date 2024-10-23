@@ -23,7 +23,6 @@ class DatasetDumper(ABC):
     class SensorBind(Bind):
         """绑定一个 Sensor 至一个或多个任务, 多用于储存数据或计算位姿关系"""
         actor: Sensor
-        sensor: Sensor = None  # TODO: 兼容设置, 后续移除
     
     def __init__(self, root_path: str, max_workers: int = 3):
         # PRIVATE
