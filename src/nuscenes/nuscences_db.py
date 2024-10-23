@@ -52,6 +52,7 @@ class NuScenesDB:
         self._create_table_category()
         self._create_table_instance()
         self._create_table_sample_annotation()
+        self._create_table_lidarseg()
     
     def _create_table_log(self):
         self._cursor.execute('''
@@ -185,7 +186,8 @@ class NuScenesDB:
             CREATE TABLE IF NOT EXISTS category (
                 token TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
-                description TEXT NOT NULL
+                description TEXT NOT NULL,
+                index INTEGER NOT NULL
             )
         ''')
 
@@ -220,6 +222,15 @@ class NuScenesDB:
                 FOREIGN KEY (instance_token) REFERENCES instance (token),
                 FOREIGN KEY (prev) REFERENCES sample_annotation (token),
                 FOREIGN KEY (next) REFERENCES sample_annotation (token)
+            )
+        ''')
+        
+    def _create_table_lidarseg(self):
+        self._cursor.execute('''
+            CREATE TABLE IF NOT EXISTS lidarseg (
+                token TEXT PRIMARY KEY,
+                sample_data_token TEXT NOT NULL,
+                filename TEXT NOT NULL
             )
         ''')
 
@@ -501,6 +512,7 @@ class NuScenesDB:
         return token
 
     def add_category(self, *,
+                     index: int,
                      name: str,
                      description: str = 'UNKNOWN') -> str:
         """增加一条 category 记录
@@ -515,8 +527,8 @@ class NuScenesDB:
         token = self.get_nuscenes_token()
         
         self._cursor.execute('''
-            INSERT INTO category (token, name, description) VALUES (?, ?, ?)
-        ''', (token, name, description))
+            INSERT INTO category (token, name, description, index) VALUES (?, ?, ?, ?)
+        ''', (token, name, description, index))
         
         self._conn.commit()
         return token
@@ -824,6 +836,19 @@ class NuScenesDB:
         """
         self._cursor.execute('''
             SELECT * FROM category
+        ''')
+        rows = self._cursor.fetchall()
+        columns = [column[0] for column in self._cursor.description]
+        return json.dumps([dict(zip(columns, row)) for row in rows])
+
+    def dump_lidarseg(self) -> str:
+        """导出 lidarseg 表为 json 格式
+
+        Returns:
+            str: json 格式的 lidarseg 表, 与 nuScence 定义一致
+        """
+        self._cursor.execute('''
+            SELECT * FROM lidarseg
         ''')
         rows = self._cursor.fetchall()
         columns = [column[0] for column in self._cursor.description]
