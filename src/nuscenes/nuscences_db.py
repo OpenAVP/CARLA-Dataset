@@ -549,7 +549,7 @@ class NuScenesDB:
         
         self._cursor.execute('''
             INSERT INTO instance (token, category_token, first_annotation_token, last_annotation_token) VALUES (?, ?, ?, ?)
-        ''', (token, category_token, first_annotation_token, None))
+        ''', (token, category_token, first_annotation_token, first_annotation_token))
         
         self._conn.commit()
         return token
