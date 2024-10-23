@@ -323,7 +323,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
         # 准备并写入 lidarseg 数据
         # WARNING: 禁止更改该操作所在位置
         file_name_lidarseg = f"{token}_lidarseg.bin"
-        short_path_lidarseg = os.path.join('lidarseg', file_name_lidarseg)
+        short_path_lidarseg = os.path.join('lidarseg', self.current_sequence_name, file_name_lidarseg)
         path_lidarseg = os.path.join(self.current_sequence_path, short_path_lidarseg)
         seg_id = bind.actor.data.content[:, 3]
         obj_id = bind.actor.data.content[:, 4]
@@ -526,7 +526,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
 
     def _setup_db_map(self):
         """填充 map 表."""
-        token = self._db.add_map(category='semantic_prior')
+        token = self._db.add_map(category='semantic_prior',filename='maps')
         self._token_current_map = token
 
     def _setup_db_log(self):
@@ -616,6 +616,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
         os.makedirs(os.path.join(self.current_sequence_path, 'sweeps'))
         os.makedirs(os.path.join(self.current_sequence_path, self.current_sequence_name))
         os.makedirs(os.path.join(self.current_sequence_path, 'lidarseg'))
+        os.makedirs(os.path.join(self.current_sequence_path, 'lidarseg',self.current_sequence_name))
 
         # L2: 根据传感器绑定的 channel 创建 samples 文件夹, 并在 sweeps 文件夹下创建软连接
         for bind in [bind for bind in self.binds if isinstance(bind, self.SensorBind)]:
