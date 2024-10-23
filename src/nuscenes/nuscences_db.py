@@ -895,7 +895,7 @@ class NuScenesDB:
     def get_category_token_by_index(self, index: int) -> str:
         """根据 index 获取 category 表中的 token"""
         self._cursor.execute('''
-            SELECT token FROM category WHERE index = ?
+            SELECT token FROM category WHERE seg_index = ?
         ''', (index,))
         return self._cursor.fetchone()[0]
     
