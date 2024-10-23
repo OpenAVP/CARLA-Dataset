@@ -585,6 +585,7 @@ class NuScenesDB:
             str: 插入数据库的 token
         """        
         # 转换部分数据为 json 格式
+        attribute_tokens = json.dumps(attribute_tokens)
         translation = json.dumps(translation)
         size = json.dumps(size)
         rotation = json.dumps(rotation)
