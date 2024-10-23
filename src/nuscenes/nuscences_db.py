@@ -187,7 +187,7 @@ class NuScenesDB:
                 token TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL,
-                index INTEGER NOT NULL
+                seg_index INTEGER NOT NULL
             )
         ''')
 
@@ -527,7 +527,7 @@ class NuScenesDB:
         token = self.get_nuscenes_token()
         
         self._cursor.execute('''
-            INSERT INTO category (token, name, description, index) VALUES (?, ?, ?, ?)
+            INSERT INTO category (token, name, description, seg_index) VALUES (?, ?, ?, ?)
         ''', (token, name, description, index))
         
         self._conn.commit()
@@ -857,7 +857,12 @@ class NuScenesDB:
         ''')
         rows = self._cursor.fetchall()
         columns = [column[0] for column in self._cursor.description]
-        return json.dumps([dict(zip(columns, row)) for row in rows])
+        
+        # 在字典中替换 'seg_index' 为 'index' 
+        return json.dumps([
+            {('index' if col == 'seg_index' else col): value for col, value in zip(columns, row)}
+            for row in rows
+        ])
 
     def dump_lidarseg(self) -> str:
         """导出 lidarseg 表为 json 格式
