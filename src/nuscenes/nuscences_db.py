@@ -534,10 +534,12 @@ class NuScenesDB:
         return token
 
     def add_instance(self, *,
+                     category_token: str,
                      first_annotation_token: str = None) -> str:
         """增加一条 instance 记录
 
         Args:
+            category_token (str): 指向的 category 记录的 token
             first_annotation_token (str, optional): 指向的第一个 sample_annotation 记录的 token, 默认为 None
 
         Returns:
@@ -546,8 +548,8 @@ class NuScenesDB:
         token = self.get_nuscenes_token()
         
         self._cursor.execute('''
-            INSERT INTO instance (token, first_annotation_token, last_annotation_token) VALUES (?, ?, ?)
-        ''', (token, first_annotation_token, None))
+            INSERT INTO instance (token, category_token, first_annotation_token, last_annotation_token) VALUES (?, ?, ?, ?)
+        ''', (token, category_token, first_annotation_token, None))
         
         self._conn.commit()
         return token
