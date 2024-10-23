@@ -555,6 +555,7 @@ class NuScenesDB:
         return token
     
     def add_sample_annotation(self, *,
+                               token: str,
                                sample_token: str,
                                visibility_token: str,
                                attribute_tokens: List[str] = [],
@@ -568,6 +569,7 @@ class NuScenesDB:
         """增加一条 sample_annotation 记录
 
         Args:
+            token (str): 指向的 sample_data 记录的 token
             sample_token (str): 指向的 sample 记录的 token
             visibility_token (str): 指向的 visibility 记录的 token
             attribute_tokens (list[str], optional): 属性记录的 token 列表, 默认为空列表
@@ -581,9 +583,7 @@ class NuScenesDB:
 
         Returns:
             str: 插入数据库的 token
-        """
-        token = self.get_nuscenes_token()
-        
+        """        
         # 转换部分数据为 json 格式
         translation = json.dumps(translation)
         size = json.dumps(size)
