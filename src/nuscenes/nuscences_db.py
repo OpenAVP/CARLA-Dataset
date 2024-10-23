@@ -196,8 +196,8 @@ class NuScenesDB:
             CREATE TABLE IF NOT EXISTS instance (
                 token TEXT PRIMARY KEY,
                 category_token TEXT NOT NULL,
-                first_sample_token TEXT,
-                last_sample_token TEXT,
+                first_annotation_token TEXT,
+                last_annotation_token TEXT,
                 FOREIGN KEY (category_token) REFERENCES category (token)
             )
         ''')
