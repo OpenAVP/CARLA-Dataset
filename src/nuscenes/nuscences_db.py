@@ -534,12 +534,11 @@ class NuScenesDB:
         return token
 
     def add_instance(self, *,
-                     name: str,
                      first_annotation_token: str = None) -> str:
         """增加一条 instance 记录
 
         Args:
-            name (str): 实例名称, 如: 'car'.
+            first_annotation_token (str, optional): 指向的第一个 sample_annotation 记录的 token, 默认为 None
 
         Returns:
             str: 插入数据库的 token
@@ -547,8 +546,8 @@ class NuScenesDB:
         token = self.get_nuscenes_token()
         
         self._cursor.execute('''
-            INSERT INTO instance (token, name, first_annotation_token, last_annotation_token) VALUES (?, ?, ?, ?)
-        ''', (token, name, first_annotation_token, None))
+            INSERT INTO instance (token, first_annotation_token, last_annotation_token) VALUES (?, ?, ?)
+        ''', (token, first_annotation_token, None))
         
         self._conn.commit()
         return token
@@ -896,3 +895,12 @@ class NuScenesDB:
             SELECT token FROM category WHERE index = ?
         ''', (index,))
         return self._cursor.fetchone()[0]
+    
+    def update_instance(self, *,
+                        token: str,
+                        last_annotation_token: str) -> None:
+        """更新 instance 表中的记录"""
+        self._cursor.execute('''
+            UPDATE instance SET last_annotation_token = ? WHERE token = ?
+        ''', (last_annotation_token, token))
+        self._conn.commit()
