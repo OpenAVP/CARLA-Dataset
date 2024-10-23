@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Set
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
 from contextlib import contextmanager
+from contextlib import contextmanager
 
 from packages.carla1s.utils.logging import get_logger
 from packages.carla1s.actors import Sensor, Actor
@@ -67,6 +68,7 @@ class DatasetDumper(ABC):
         return set(bind.sensor for bind in self.binds)
 
     @abstractmethod
+    @contextmanager
     @contextmanager
     def create_sequence(self, name: str = None):
         """创建一个新的序列.
