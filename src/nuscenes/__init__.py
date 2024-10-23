@@ -1,3 +1,3 @@
-from .nuscences_dumper import NuScenesDumper
+from .nuscences_lidarseg_dumper import NuScenesLidarsegDumper
 
-__all__ = ['NuScenesDumper']
+__all__ = ['NuScenesLidarsegDumper']
