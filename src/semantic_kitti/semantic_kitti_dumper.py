@@ -13,6 +13,39 @@ from ..dataset_dumper import DatasetDumper
 
 class SemanticKittiDumper(DatasetDumper):
     
+    MAPPING_SEG_CARLA_TO_KITTI = {
+        1: 40,   # road - road
+        2: 48,   # sidewalk - sidewalk
+        3: 50,   # building - building
+        4: 52,   # wall - other-structure
+        5: 51,   # fence - fence
+        6: 80,   # pole - pole
+        7: 99,   # traffic light - other-object
+        8: 81,   # traffic sign - traffic-sign
+        9: 70,   # vegetation - vegetation
+        10: 72,  # terrain - terrain
+        11: 0,   # sky - unlabeled
+        12: 30,  # pedestrian - person
+        13: 31,  # rider - bicyclist
+        14: 10,  # car - car
+        15: 18,  # truck - truck
+        16: 13,  # bus - bus
+        17: 16,  # train - on-rails
+        18: 15,  # motorcycle - motorcycle
+        19: 11,  # bicycle - bicycle
+        20: 20,  # static - outlier
+        21: 259, # dynamic - moving-other-vehicle
+        22: 99,  # other - other-object
+        23: 49,  # water - other-ground
+        24: 60,  # road line - lane-marking
+        25: 49,  # ground - other-ground
+        26: 52,  # bridge - other-structure
+        27: 49,  # rail - other-ground
+        28: 51,  # guard rail - fence
+        29: 60,  # lane-marking
+        30: 44   # parking
+    }
+    
     @dataclass
     class SemanticLidarBind(DatasetDumper.SensorBind):
         """绑定语义激光雷达至输出点云和标签文件夹路径"""
@@ -176,36 +209,7 @@ class SemanticKittiDumper(DatasetDumper):
                 
         # 处理标注
         seg = bind.sensor.data.content[:, 3]
-        seg[seg == 1] = 40  # road - road
-        seg[seg == 2] = 48  # sidewalk - sidewalk
-        seg[seg == 3] = 50  # building - building
-        seg[seg == 4] = 52  # wall - other-structure
-        seg[seg == 5] = 51  # fence - fence
-        seg[seg == 6] = 80  # pole - pole
-        seg[seg == 7] = 99  # traffic light - other-object
-        seg[seg == 8] = 81  # traffic sign - traffic-sign
-        seg[seg == 9] = 70  # vegetation - vegetation
-        seg[seg == 10] = 72  # terrain - terrain
-        seg[seg == 11] = 0  # sky - unlabeled
-        seg[seg == 12] = 30  # pedestrian - person
-        seg[seg == 13] = 31  # rider - bicyclist
-        seg[seg == 14] = 10  # car - car
-        seg[seg == 15] = 18  # truck - truck
-        seg[seg == 16] = 13  # bus - bus
-        seg[seg == 17] = 16  # train - on-rails
-        seg[seg == 18] = 15  # motorcycle - motorcycle
-        seg[seg == 19] = 11  # bicycle - bicycle
-        seg[seg == 20] = 20  # static - outlier
-        seg[seg == 21] = 259  # dynamic - moving-other-vehicle
-        seg[seg == 22] = 99  # other - other-object
-        seg[seg == 23] = 49  # water - other-ground
-        seg[seg == 24] = 60  # road line - lane-marking
-        seg[seg == 25] = 49  # ground - other-ground
-        seg[seg == 26] = 52  # bridge - other-structure
-        seg[seg == 27] = 49  # rail - other-ground
-        seg[seg == 28] = 51  # guard rail - fence
-        seg[seg == 29] = 60  # lane-marking
-        seg[seg == 30] = 44  # parking
+        seg = np.vectorize(self.MAPPING_SEG_CARLA_TO_KITTI.get)(seg)
 
         oid = bind.sensor.data.content[:, 4]
         labels = np.column_stack((seg.astype(np.uint16), oid.astype(np.uint16)))
