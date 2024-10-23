@@ -20,22 +20,22 @@ class SemanticKittiDumper(DatasetDumper):
         labels_path: str
         
     @dataclass
-    class TimestampBind(DatasetDumper.SensorBind):
+    class TimestampBind(DatasetDumper.Bind):
         """绑定时间戳至文件路径"""
         data_path: str
     
     @dataclass
-    class PoseBind(DatasetDumper.SensorBind):
+    class PoseBind(DatasetDumper.Bind):
         """绑定位姿至文件路径"""
         data_path: str
     
     @dataclass
-    class ImageBind(DatasetDumper.SensorBind):
+    class CameraBind(DatasetDumper.SensorBind):
         """绑定图像至输出文件夹路径"""
         data_path: str
     
     @dataclass
-    class CalibTrBind(DatasetDumper.SensorBind):
+    class CalibTrBind(DatasetDumper.Bind):
         """绑定标定数据至文件路径"""
         data_path: str
     
@@ -75,7 +75,7 @@ class SemanticKittiDumper(DatasetDumper):
         for bind in self.binds:
             if isinstance(bind, self.SemanticLidarBind):
                 self._promises.append(self.thread_pool.submit(self._dump_semantic_lidar, bind))
-            elif isinstance(bind, self.ImageBind):
+            elif isinstance(bind, self.CameraBind):
                 self._promises.append(self.thread_pool.submit(self._dump_image, bind))
             elif isinstance(bind, self.TimestampBind):
                 self._promises.append(self.thread_pool.submit(self._dump_timestamp, bind))
@@ -88,7 +88,7 @@ class SemanticKittiDumper(DatasetDumper):
                     sensor: Sensor, 
                     *,
                     data_folder: str) -> 'DatasetDumper':
-        self._binds.append(self.ImageBind(sensor, data_folder))
+        self._binds.append(self.CameraBind(sensor, data_folder))
         return self
 
     def bind_semantic_lidar(self, 
@@ -150,7 +150,7 @@ class SemanticKittiDumper(DatasetDumper):
         
         self._promises.append(self.thread_pool.submit(self._dump_calib, calib_bind, pose_bind))
 
-    def _dump_image(self, bind: ImageBind):
+    def _dump_image(self, bind: CameraBind):
         # 阻塞等待传感器更新
         bind.sensor.on_data_ready.wait()
         # 储存数据
@@ -279,7 +279,7 @@ class SemanticKittiDumper(DatasetDumper):
         # 准备对象
         target = bind_calib.sensor
         cam_0 = bind_pose.sensor
-        other_cams = set(bind.sensor for bind in self.binds if isinstance(bind, self.ImageBind) and bind.sensor != cam_0)
+        other_cams = set(bind.sensor for bind in self.binds if isinstance(bind, self.CameraBind) and bind.sensor != cam_0)
         # 确保cam_0在第一位
         cams = [cam_0] + list(other_cams)
         
