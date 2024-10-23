@@ -876,3 +876,16 @@ class NuScenesDB:
         rows = self._cursor.fetchall()
         columns = [column[0] for column in self._cursor.description]
         return json.dumps([dict(zip(columns, row)) for row in rows])
+    
+    def dump_sample_annotation(self) -> str:
+        """导出 sample_annotation 表为 json 格式
+
+        Returns:
+            str: json 格式的 sample_annotation 表, 与 nuScence 定义一致
+        """
+        self._cursor.execute('''
+            SELECT * FROM sample_annotation
+        ''')
+        rows = self._cursor.fetchall()
+        columns = [column[0] for column in self._cursor.description]
+        return json.dumps([dict(zip(columns, row)) for row in rows])
