@@ -607,6 +607,24 @@ class NuScenesDB:
         self._conn.commit()
         return token    
     
+    def add_lidarseg(self, *,
+                     token: str,
+                     sample_data_token: str,
+                     filename: str) -> str:
+        """增加一条 lidarseg 记录
+
+        Args:
+            token (str): 指向的 sample_data 记录的 token
+            sample_data_token (str): 指向的 sample_data 记录的 token
+            filename (str): 文件名
+        """
+        self._cursor.execute('''
+            INSERT INTO lidarseg (token, sample_data_token, filename) VALUES (?, ?, ?)
+        ''', (token, sample_data_token, filename))
+        
+        self._conn.commit()
+        return token
+    
     def dump_log(self) -> str:
         """导出 log 表为 json 格式
 
