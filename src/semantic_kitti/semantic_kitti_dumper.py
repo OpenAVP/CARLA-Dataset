@@ -185,17 +185,17 @@ class SemanticKittiDumper(DatasetDumper):
 
     def _dump_image(self, bind: CameraBind):
         # 阻塞等待传感器更新
-        bind.sensor.on_data_ready.wait()
+        bind.actor.on_data_ready.wait()
         # 储存数据
         file_name = f"{self.current_frame_name}.png"
         path = os.path.join(self.current_sequence_path, bind.data_path, file_name)
-        cv2.imwrite(path, bind.sensor.data.content)
+        cv2.imwrite(path, bind.actor.data.content)
         # 打印日志
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped image to {path}")
+        self.logger.debug(f"[frame={bind.actor.data.frame}] Dumped image to {path}")
 
     def _dump_semantic_lidar(self, bind: SemanticLidarBind):
         # 阻塞等待传感器更新
-        bind.sensor.on_data_ready.wait()
+        bind.actor.on_data_ready.wait()
         
         # 准备储存路径
         file_name = f"{self.current_frame_name}"
@@ -203,15 +203,15 @@ class SemanticKittiDumper(DatasetDumper):
         path_labels = os.path.join(self.current_sequence_path, bind.labels_path, file_name + '.label')
         
         # 处理点云
-        points = [Point(x=x, y=-y, z=z) for x, y, z in bind.sensor.data.content[:, :3]]
+        points = [Point(x=x, y=-y, z=z) for x, y, z in bind.actor.data.content[:, :3]]
         points = CoordConverter.from_system(*points).get_list()
         points = np.array([[p.x, p.y, p.z, 1.0] for p in points], dtype=np.float32)
                 
         # 处理标注
-        seg = bind.sensor.data.content[:, 3]
+        seg = bind.actor.data.content[:, 3]
         seg = np.vectorize(self.MAPPING_SEG_CARLA_TO_KITTI.get)(seg)
 
-        oid = bind.sensor.data.content[:, 4]
+        oid = bind.actor.data.content[:, 4]
         labels = np.column_stack((seg.astype(np.uint16), oid.astype(np.uint16)))
         
         # 储存数据
@@ -219,8 +219,8 @@ class SemanticKittiDumper(DatasetDumper):
         labels.tofile(path_labels)
         
         # 打印日志
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped pointcloud(shape={points.shape}) to {path_data}")
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped labels(shape={labels.shape}) to {path_labels}")
+        self.logger.debug(f"[frame={bind.actor.data.frame}] Dumped pointcloud(shape={points.shape}) to {path_data}")
+        self.logger.debug(f"[frame={bind.actor.data.frame}] Dumped labels(shape={labels.shape}) to {path_labels}")
 
     def _dump_timestamp(self, bind: DatasetDumper.SensorBind):
         """导出时间戳, 以秒为单位, 使用科学计数法, 保留小数点后 6 位.
@@ -228,14 +228,14 @@ class SemanticKittiDumper(DatasetDumper):
         Args:
             bind (DatasetDumper.SensorBind): 参考的传感器绑定
         """
-        bind.sensor.on_data_ready.wait()
+        bind.actor.on_data_ready.wait()
         if self._timestamp_offset is None:
-            self._timestamp_offset = bind.sensor.data.timestamp
-        timestamp = bind.sensor.data.timestamp - self._timestamp_offset
+            self._timestamp_offset = bind.actor.data.timestamp
+        timestamp = bind.actor.data.timestamp - self._timestamp_offset
         with open(os.path.join(self.current_sequence_path, bind.data_path), 'a') as f:
             f.write(f"{timestamp:.6e}\n")
             
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped timestamp to {os.path.join(self.current_sequence_path, bind.data_path)}, value: {timestamp:.6e}")
+        self.logger.debug(f"[frame={bind.actor.data.frame}] Dumped timestamp to {os.path.join(self.current_sequence_path, bind.data_path)}, value: {timestamp:.6e}")
 
     def _dump_pose(self, bind: PoseBind):
         """导出位姿数据, 是 3x4 的变换矩阵, 表示当前帧参考传感器到初始帧参考传感器的位姿变换.
@@ -243,13 +243,13 @@ class SemanticKittiDumper(DatasetDumper):
         Args:
             bind (PoseBind): 参考的传感器绑定
         """
-        bind.sensor.on_data_ready.wait()
+        bind.actor.on_data_ready.wait()
         
         # 准备储存路径
         path = os.path.join(self.current_sequence_path, bind.data_path)
         
         # 获取位姿数据并转换为
-        pose = bind.sensor.data.transform
+        pose = bind.actor.data.transform
         
         # 如果 offset 未设置, 则设置为当前帧的位姿
         if self._pose_offset is None:
@@ -273,17 +273,17 @@ class SemanticKittiDumper(DatasetDumper):
         # 保存到文件
         with open(path, 'a') as f:
             f.write(f"{pose_matrix}\n")
-        self.logger.debug(f"[frame={bind.sensor.data.frame}] Dumped pose to {path}")
+        self.logger.debug(f"[frame={bind.actor.data.frame}] Dumped pose to {path}")
 
     def _dump_calib(self, bind_calib: CalibTrBind, bind_pose: PoseBind):
         # 阻塞等待传感器更新
-        bind_calib.sensor.on_data_ready.wait()
-        bind_pose.sensor.on_data_ready.wait()
+        bind_calib.actor.on_data_ready.wait()
+        bind_pose.actor.on_data_ready.wait()
         
         # 准备对象
-        target = bind_calib.sensor
-        cam_0 = bind_pose.sensor
-        other_cams = set(bind.sensor for bind in self.binds if isinstance(bind, self.CameraBind) and bind.sensor != cam_0)
+        target = bind_calib.actor
+        cam_0 = bind_pose.actor
+        other_cams = set(bind.actor for bind in self.binds if isinstance(bind, self.CameraBind) and bind.actor != cam_0)
         # 确保cam_0在第一位
         cams = [cam_0] + list(other_cams)
         
@@ -343,4 +343,4 @@ class SemanticKittiDumper(DatasetDumper):
             calibfile.write("Tr:")
             string = ' '.join(['{:.12e}'.format(value) for row in Tr[:3, :] for value in row])
             calibfile.write(string + "\n")
-            self.logger.debug(f"[frame={bind_calib.sensor.data.frame}] Dumped calib Tr to {path}")
+            self.logger.debug(f"[frame={bind_calib.actor.data.frame}] Dumped calib Tr to {path}")
