@@ -290,7 +290,9 @@ class NuScenesLidarsegDumper(DatasetDumper):
         
         # 储存点云数据
         # WARNING: 这里使用了语义分割雷达
-        data = np.insert(bind.actor.data.content, 4, np.arange(1, bind.actor.data.content.shape[0] + 1), axis=1)
+        data = bind.actor.data.content.copy() # FORMAT: [x, y, z, semantic_id, object_id]
+        data[:, 3] = 1  # intensity override
+        data[:, 4] = 0  # ring index override
         data.tofile(path)
         self.logger.debug(f"Dumped '{bind.channel}' lidar to {path}, points: {data.shape[0]}")
         
