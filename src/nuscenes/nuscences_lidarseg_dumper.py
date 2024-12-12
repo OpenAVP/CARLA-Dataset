@@ -76,6 +76,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
     
     def __init__(self, 
                  root_path: str, 
+                 fps: int,
                  *, 
                  max_workers: int = 3,
                  map_name: str = 'UNKNOWN_CARLA_MAP',
@@ -99,6 +100,13 @@ class NuScenesLidarsegDumper(DatasetDumper):
         self._current_frame_timestamp: float = 0.0
         self._current_frame_ego_pose_translation: List[float] = [0.0, 0.0, 0.0]
         self._current_frame_ego_pose_rotation: List[float] = [0.0, 0.0, 0.0, 1.0]
+        self._yaw: float = 0.0
+        # SAVED INFO
+        self._previous_frame_ego_pose_translation: List[float] = [0.0, 0.0, 0.0]
+        self._previous_frame_ego_pose_rotation: List[float] = [0.0, 0.0, 0.0, 1.0]
+        self._previous_frame_vel: List[float] = [0.0, 0.0, 0.0]
+        self._previous_yaw: float = 0.0
+        self._fps: int = fps
         # LOCK
         self._lock_db: Lock = Lock()
 
@@ -161,9 +169,17 @@ class NuScenesLidarsegDumper(DatasetDumper):
         if not vehicle_bind:
             raise ValueError("Vehicle bind is not found, please call `bind_vehicle()` first.")
         tf = vehicle_bind.actor.get_transform()
+        self._previous_frame_ego_pose_translation = self._current_frame_ego_pose_translation
+        self._previous_frame_ego_pose_rotation = self._current_frame_ego_pose_rotation
         self._current_frame_ego_pose_translation = [tf.x, tf.y, tf.z]
         self._current_frame_ego_pose_rotation = tf.quaternion.tolist()
+        self._previous_yaw = np.deg2rad(self._yaw)
+        self._yaw = np.deg2rad(tf.yaw)
         
+        # TO DO:
+        # 存储自车信息，保存canbus数据
+
+
         # 并行处理传感器数据
         for bind in self.binds:
             if isinstance(bind, self.CameraBind):
@@ -172,6 +188,8 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 self._promises.append(self.thread_pool.submit(self._dump_lidar_with_sample_data_and_lidarseg, bind, vehicle_bind))
             if isinstance(bind, self.SemanticLidarBind):
                 self._promises.append(self.thread_pool.submit(self._dump_instance_with_annotation, bind, vehicle_bind))
+            if isinstance(bind, self.VehicleBind):
+                self._promises.append(self.thread_pool.submit(self._dump_simple_can_bus, bind))
         
         return self
     
@@ -235,6 +253,8 @@ class NuScenesLidarsegDumper(DatasetDumper):
         self._dump_json_to_file(self._db.dump_lidarseg(), os.path.join(db_folder, 'lidarseg.json'))
         self._dump_json_to_file(self._db.dump_instance(), os.path.join(db_folder, 'instance.json'))
         self._dump_json_to_file(self._db.dump_sample_annotation(), os.path.join(db_folder, 'sample_annotation.json'))
+        self._dump_json_to_file(self._db.dump_can_bus_pose(), os.path.join(self.current_sequence_path, 'can_bus', 'v1.0-demo_pose.json'))
+        self._dump_json_to_file(self._db.dump_can_bus_steeranglefeedback(), os.path.join(self.current_sequence_path, 'can_bus', 'v1.0-demo_steeranglefeedback.json'))
 
         self.logger.info(f"Database dumped successfully.")
 
@@ -346,11 +366,8 @@ class NuScenesLidarsegDumper(DatasetDumper):
         seg_id[index_ego] = self.MAPPING_SEG_NUSCENES_EGO
         
         # 写入数据
-<<<<<<< HEAD
         seg_id = seg_id.astype('uint8')  # 标签的格式设置为 uint8
-=======
         seg_id = seg_id.astype('uint8')
->>>>>>> 5fafa47... change the lidar data from float64 to float32
         seg_id.tofile(path_lidarseg)
         self.logger.debug(f"Dumped '{bind.channel}' lidarseg to {path_lidarseg}, points: {seg_id.shape[0]}")
 
@@ -466,6 +483,67 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 )
                 self.logger.debug(f"Created annotation record for object_id: {info.object_id}, token: '{token_annotation}'")
 
+    def _dump_simple_can_bus(self, bind: VehicleBind):
+        if bind and bind.actor:
+            with self._lock_db:
+                token_annotation = self._db.get_nuscenes_token()
+                vel = (np.array(self._current_frame_ego_pose_translation) - np.array(self._previous_frame_ego_pose_translation)) / self._fps
+                accel = (vel - np.array(self._previous_frame_vel)) / self._fps
+
+                dt = 1 / self._fps
+                qt = np.array(self._previous_frame_ego_pose_rotation)
+                qt1 = np.array(self._current_frame_ego_pose_rotation)
+
+                # 计算增量四元数 Delta_q = qt1 * qt^-1
+                qt_inv = np.array([qt[0], -qt[1], -qt[2], -qt[3]])
+
+                w1, x1, y1, z1 = qt1
+                w2, x2, y2, z2 = qt_inv
+                
+                w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+                x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+                y = w1*y2 + y1*w2 + z1*x2 - x1*z2
+                z = w1*z2 + z1*w2 + x1*y2 - y1*x2
+                
+                delta_q = np.array([w, x, y, z])
+                
+                # 提取增量四元数的虚部 (x_delta, y_delta, z_delta)
+                x_delta, y_delta, z_delta = delta_q[1:]
+                
+                # 估算角速度
+                angular_velocity = 2 * np.array([x_delta, y_delta, z_delta]) / dt
+
+                # tesla model3 轴距
+                L = 2.875
+
+                v = np.sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2])
+                w = (self._previous_yaw - self._yaw) / dt
+
+                if w == 0:
+                    value = 0.0
+                else:
+                    R = v / w
+                    print(v,w,R)
+                    value = np.arctan(L / R)
+
+                vel = vel.tolist()
+                accel = accel.tolist()
+                rotation_rate = angular_velocity.tolist()
+
+                token = self._db.add_can_bus_pose(
+                    token=token_annotation,
+                    utime=self._current_frame_timestamp,
+                    vel=vel,
+                    accel=accel,
+                    rotation_rate=rotation_rate
+                )
+                self.logger.debug(f"Created can bus pose record with token: '{token}'")
+                token = self._db.add_can_bus_steeranglefeedback(
+                    token=token_annotation,
+                    utime=self._current_frame_timestamp,
+                    value=value
+                )
+                self.logger.debug(f"Created can bus steeranglefeedback record with token: '{token}'")
 
     def _setup_database(self):
         """创建数据库文件."""
@@ -626,6 +704,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
         os.makedirs(os.path.join(self.current_sequence_path, self.current_sequence_name))
         os.makedirs(os.path.join(self.current_sequence_path, 'lidarseg'))
         os.makedirs(os.path.join(self.current_sequence_path, 'lidarseg',self.current_sequence_name))
+        os.makedirs(os.path.join(self.current_sequence_path, 'can_bus'))
 
         # L2: 根据传感器绑定的 channel 创建 samples 文件夹, 并在 sweeps 文件夹下创建软连接
         for bind in [bind for bind in self.binds if isinstance(bind, self.SensorBind)]:

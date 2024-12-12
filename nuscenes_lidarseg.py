@@ -95,7 +95,7 @@ def main(*,
         exe.wait_sim_seconds(1)
         
         # SETUP DUMPER
-        dumper = NuScenesLidarsegDumper(output)
+        dumper = NuScenesLidarsegDumper(output, fps)
         dumper.bind_camera(cam_front, channel="CAM_FRONT")
         dumper.bind_camera(cam_front_left, channel="CAM_FRONT_LEFT")
         dumper.bind_camera(cam_front_right, channel="CAM_FRONT_RIGHT")

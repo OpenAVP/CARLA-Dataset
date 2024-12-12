@@ -53,6 +53,8 @@ class NuScenesDB:
         self._create_table_instance()
         self._create_table_sample_annotation()
         self._create_table_lidarseg()
+        self._create_table_can_bus_pose()
+        self._create_table_can_bus_steeranglefeedback()
     
     def _create_table_log(self):
         self._cursor.execute('''
@@ -233,6 +235,27 @@ class NuScenesDB:
                 filename TEXT NOT NULL
             )
         ''')
+
+    def _create_table_can_bus_pose(self):
+        self._cursor.execute('''
+            CREATE TABLE IF NOT EXISTS can_bus_pose (
+                token TEXT PRIMARY KEY,
+                utime INTEGER NOT NULL,
+                vel TEXT NOT NULL,  -- Store as JSON string
+                accel TEXT NOT NULL,  -- Store as JSON string
+                rotation_rate TEXT NOT NULL  -- Store as JSON string
+            )
+        ''')
+
+    def _create_table_can_bus_steeranglefeedback(self):
+        self._cursor.execute('''
+            CREATE TABLE IF NOT EXISTS can_bus_steeranglefeedback (
+                token TEXT PRIMARY KEY,
+                utime INTEGER NOT NULL,
+                value TEXT NOT NULL  -- Store as JSON string
+            )
+        ''')
+
 
     def add_log(self, *,
                 dtime: datetime.datetime = datetime.datetime.now(),
@@ -627,6 +650,63 @@ class NuScenesDB:
         self._conn.commit()
         return token
     
+    def add_can_bus_pose(self, *,
+                     token: str,
+                     utime: float = time.time(),
+                     vel: List[float],
+                     accel: List[float],
+                     rotation_rate: List[float]) -> str:
+        """增加一条 can_bus_pose 记录
+
+        Args:
+            token (str, optional): 主键，仅用作占位
+            utime (float, optional): 时间戳, 默认使用当前时间戳
+            vel (list[float]): 速度矢量
+            accel (list[float]): 加速度矢量
+            rotation_rate (list[float]): 角速度矢量
+
+        Returns:
+            str: 插入数据库的 token
+        """
+        utime = self.get_nuscenes_timestamp(utime)
+        
+        # 转换部分数据为 json 格式
+        vel = json.dumps(vel)
+        accel = json.dumps(accel)
+        rotation_rate = json.dumps(rotation_rate)
+        
+        self._cursor.execute('''
+            INSERT INTO can_bus_pose (token, utime, vel, accel, rotation_rate) VALUES (?, ?, ?, ?, ?)
+        ''', (token, utime, vel, accel, rotation_rate))
+        
+        self._conn.commit()
+        return token
+
+    def add_can_bus_steeranglefeedback(self, *,
+                                       token: str,
+                                       utime: float = time.time(),
+                                       value: float) -> str:
+        """增加一条 can_bus_steeranglefeedback 记录
+
+        Args:
+            token (str, optional): 主键，仅用作占位
+            utime (float, optional): 时间戳, 默认使用当前时间戳
+            value (float): steering angle, 取值范围为[-7.7, 6.3]
+
+        Returns:
+            str: 插入数据库的 token
+        """
+        utime = self.get_nuscenes_timestamp(utime)
+
+        value = json.dumps(value)
+        
+        self._cursor.execute('''
+            INSERT INTO can_bus_steeranglefeedback (token, utime, value) VALUES (?, ?, ?)
+        ''', (token, utime, value))
+        
+        self._conn.commit()
+        return token
+
     def dump_log(self) -> str:
         """导出 log 表为 json 格式
 
@@ -903,6 +983,51 @@ class NuScenesDB:
             result.append(row_dict)
         
         return json.dumps(result)
+
+    def dump_can_bus_pose(self) -> str:
+        """导出 can_bus_pose 表为 json 格式
+
+        Returns:
+            str: json 格式的 can_bus_pose 表, 内含 UniAD 系模型需要读取的数据
+        """
+        self._cursor.execute('''
+            SELECT * FROM can_bus_pose
+        ''')
+        rows = self._cursor.fetchall()
+        columns = [column[0] for column in self._cursor.description]
+        
+        result = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            # Decode the JSON strings for vel, accel, and rotation_rate
+            row_dict['vel'] = json.loads(row_dict['vel'])
+            row_dict['accel'] = json.loads(row_dict['accel'])
+            row_dict['rotation_rate'] = json.loads(row_dict['rotation_rate'])
+            result.append(row_dict)
+            
+        return json.dumps(result)
+
+    def dump_can_bus_steeranglefeedback(self) -> str:
+        """导出 can_bus_steeranglefeedback 表为 json 格式
+
+        Returns:
+            str: json 格式的 can_bus_steeranglefeedback 表, 内含 UniAD 系模型需要读取的数据
+        """
+        self._cursor.execute('''
+            SELECT * FROM can_bus_steeranglefeedback
+        ''')
+        rows = self._cursor.fetchall()
+        columns = [column[0] for column in self._cursor.description]
+        
+        result = []
+        for row in rows:
+            row_dict = dict(zip(columns, row))
+            # Decode the JSON strings for value
+            row_dict['value'] = json.loads(row_dict['value'])
+            result.append(row_dict)
+            
+        return json.dumps(result)
+
 
     def get_category_token_by_index(self, index: int) -> str:
         """根据 index 获取 category 表中的 token"""
