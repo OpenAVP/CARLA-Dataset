@@ -1,3 +1,6 @@
+import logging
+import math
+
 import carla
 import json
 import os
@@ -11,10 +14,16 @@ from dataclasses import dataclass
 from typing import Union, List, Dict
 
 from packages.carla1s.actors import RgbCamera, DepthCamera, SemanticCamera, SemanticLidar, Vehicle
-from packages.carla1s.tf import Transform
+from packages.carla1s.tf import Point, CoordConverter, Transform, Coordinate
 
 from ..dataset_dumper import DatasetDumper
 from .nuscences_db import NuScenesDB
+
+def safe_value(value, default=0.0):
+        #如果数据中出现nan，则替换为0
+        if value is None or math.isnan(value) or math.isinf(value):
+            return default
+        return value
 
 
 class NuScenesLidarsegDumper(DatasetDumper):
@@ -109,6 +118,9 @@ class NuScenesLidarsegDumper(DatasetDumper):
         self._fps: int = fps
         # LOCK
         self._lock_db: Lock = Lock()
+        # sensor prev
+        self._sensor_prev_token = {}
+
 
     @property
     def current_frame_name(self) -> str:
@@ -169,10 +181,17 @@ class NuScenesLidarsegDumper(DatasetDumper):
         if not vehicle_bind:
             raise ValueError("Vehicle bind is not found, please call `bind_vehicle()` first.")
         tf = vehicle_bind.actor.get_transform()
+
         self._previous_frame_ego_pose_translation = self._current_frame_ego_pose_translation
         self._previous_frame_ego_pose_rotation = self._current_frame_ego_pose_rotation
         self._current_frame_ego_pose_translation = [tf.x, tf.y, tf.z]
         self._current_frame_ego_pose_rotation = tf.quaternion.tolist()
+
+        RT=(Coordinate(tf).change_orientation(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION)
+                            .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
+        tf.matrix[:3, :3]=RT.data.matrix[:3, :3]
+
+        
         self._previous_yaw = np.deg2rad(self._yaw)
         self._yaw = np.deg2rad(tf.yaw)
         
@@ -271,10 +290,12 @@ class NuScenesLidarsegDumper(DatasetDumper):
         # 写入 sample_data 表和 ego_pose 表, 加锁以保证操作原子化
         with self._lock_db:
             token = self._db.get_nuscenes_token()
+            sensor_id = bind.token_calibrated_sensor
+            prev_token = self._sensor_prev_token.get(sensor_id,None)
             self._db.add_sample_data(
                 token=token,
                 sample_token=self._token_current_sample,
-                calibrated_sensor_token=bind.token_calibrated_sensor,
+                calibrated_sensor_token=sensor_id,
                 ego_pose_token=token,
                 filename=short_path,
                 timestamp=self._current_frame_timestamp,
@@ -282,7 +303,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 is_key_frame=True,  # CARLA 中所有帧都是关键帧
                 width=bind.actor.attributes['image_size_x'],
                 height=bind.actor.attributes['image_size_y'],
-                prev=self._token_current_sample_data
+                prev=prev_token
             )
             
             self._db.add_ego_pose(
@@ -292,7 +313,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 rotation=self._current_frame_ego_pose_rotation
             )
             
-            self._token_current_sample_data = token
+            self._sensor_prev_token[sensor_id] = token
         
         # 打印日志
         self.logger.debug(f"Dumped '{bind.channel}' image to {path}")
@@ -311,25 +332,30 @@ class NuScenesLidarsegDumper(DatasetDumper):
         # 储存点云数据
         # WARNING: 这里使用了语义分割雷达
         data = bind.actor.data.content.copy() # FORMAT: [x, y, z, semantic_id, object_id]
+        data[:,1]=-data[:,1]
         data[:, 3] = 1  # intensity override
         data[:, 4] = 0  # ring index override
-        data_float32 = data.astype(np.float32)  # change the data format from float64 to float32
-        data_float32.tofile(path)
+        data.astype(np.float32).tofile(path)
+
+
+
         self.logger.debug(f"Dumped '{bind.channel}' lidar to {path}, points: {data.shape[0]}")
         
         # 写入 sample_data 表和 ego_pose 表, 加锁以保证操作原子化
         with self._lock_db:
             token = self._db.get_nuscenes_token()
+            sensor_id = bind.token_calibrated_sensor
+            prev_token = self._sensor_prev_token.get(sensor_id,None)
             self._db.add_sample_data(
                 token=token,
                 sample_token=self._token_current_sample,
-                calibrated_sensor_token=bind.token_calibrated_sensor,
+                calibrated_sensor_token=sensor_id,
                 ego_pose_token=token,
                 filename=short_path,
                 timestamp=self._current_frame_timestamp,
                 fileformat='pcd',
                 is_key_frame=True,  # CARLA 中所有帧都是关键帧
-                prev=self._token_current_sample_data
+                prev=prev_token
             )
             
             self._db.add_ego_pose(
@@ -339,7 +365,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 rotation=self._current_frame_ego_pose_rotation
             )
             
-            self._token_current_sample_data = token
+            self._sensor_prev_token[sensor_id] = token
             
         self.logger.debug(f"Created '{bind.channel}' sample_data record with token: '{token}'")
         self.logger.debug(f"Created '{bind.channel}' ego_pose record with token: '{token}'")
@@ -366,7 +392,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
         seg_id[index_ego] = self.MAPPING_SEG_NUSCENES_EGO
         
         # 写入数据
-        seg_id = seg_id.astype('uint8')  # 标签的格式设置为 uint8
+
         seg_id = seg_id.astype('uint8')
         seg_id.tofile(path_lidarseg)
         self.logger.debug(f"Dumped '{bind.channel}' lidarseg to {path_lidarseg}, points: {seg_id.shape[0]}")
@@ -380,6 +406,9 @@ class NuScenesLidarsegDumper(DatasetDumper):
             )
         self.logger.debug(f"Created '{bind.channel}' lidarseg record with token: '{token}'")
 
+
+    
+    
     def _dump_instance_with_annotation(self, bind: SemanticLidarBind, vehicle_bind: VehicleBind):
         # 阻塞等待传感器更新
         bind.actor.on_data_ready.wait()
@@ -390,9 +419,9 @@ class NuScenesLidarsegDumper(DatasetDumper):
             semantic_id: int
             lidar_count: int = 0
             radar_count: int = 0
-            translation = [0, 0, 0]
-            size = [0, 0, 0]
-            rotation = [0, 0, 0, 0]
+            translation = [1.0, 1.0, 1.0]
+            size = [1.0, 1.0, 1.0]
+            rotation = [1.0, 1.0, 1.0, 1.0]
         
         infos: Dict[int, ObjectInfo] = dict()
         
@@ -430,10 +459,13 @@ class NuScenesLidarsegDumper(DatasetDumper):
             bb = actor.bounding_box
             bb_tf = Transform(x=bb.location.x, y=bb.location.y, z=bb.location.z, yaw=bb.rotation.yaw, pitch=bb.rotation.pitch, roll=bb.rotation.roll)
             info = infos[actor.id]
-            info.translation = [bb.location.x, bb.location.y, bb.location.z]
-            info.size = [bb.extent.x, bb.extent.y, bb.extent.z]
+            # info.translation = [bb.location.x, bb.location.y, bb.location.z]
+            # info.size = [bb.extent.x, bb.extent.y, bb.extent.z]
+            info.translation = [safe_value(bb.location.x), safe_value(bb.location.y), safe_value(bb.location.z)]
+            info.size = [safe_value(bb.extent.x), safe_value(bb.extent.y), safe_value(bb.extent.z)]
             info.rotation = bb_tf.quaternion.tolist()
-            
+            self.logger.debug(f"Actor {actor.id}: Translation {bb.location}, Size {bb.extent}, Rotation {bb.rotation}")
+
         # 打印聚类结果日志
         self.logger.debug(f"Annotated {len(infos)} instances with MAPPING_SEG_CARLA_TO_NUSCENES filter.")
 
@@ -654,9 +686,10 @@ class NuScenesLidarsegDumper(DatasetDumper):
         """填充 calibrated_sensor 表."""
         for bind in [bind for bind in self.binds if isinstance(bind, self.SensorBind)]:
             # 阻止 token_sensor 为空的绑定
+            intrinsic = []
             if not bind.token_sensor:
                 raise ValueError(f"Sensor token is None or Empty, please call `_setup_db_sensor` first.")
-            
+
             # 对于相机计算 3x3 内参矩阵
             if isinstance(bind, self.CameraBind):
                 width = int(bind.actor.attributes['image_size_x'])
@@ -671,8 +704,16 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 intrinsic = intrinsic.tolist()
 
             tf = bind.actor.get_transform(relative=True)
-            translation = [tf.x, tf.y, tf.z]
+            translation = [tf.x,-tf.y,tf.z]
+            if isinstance(bind, self.CameraBind):
+                RT=(Coordinate(tf).change_orientation(CoordConverter.CARLA_CAM_TO_KITTI_CAM_ORIENTATION)
+                            .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
+            else:
+                RT=(Coordinate(tf).change_orientation(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION)
+                            .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
+            tf.matrix[:3, :3]=RT.data.matrix[:3, :3]
             rotation = tf.quaternion.tolist()
+
             token = self._db.add_calibrated_sensor(sensor_token=bind.token_sensor, 
                                                    translation=translation, 
                                                    rotation=rotation, 
