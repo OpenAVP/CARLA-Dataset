@@ -4,6 +4,7 @@ import argparse
 from packages.carla1s import CarlaContext, ManualExecutor
 from packages.carla1s.actors import Vehicle, RgbCamera, SemanticLidar
 from packages.carla1s.tf import Transform
+from packages.carla1s.utils.waypoint import Waypoints
 
 from src.nuscenes import NuScenesLidarsegDumper
 
@@ -14,16 +15,20 @@ def main(*,
          output: str = './temp/', 
          host: str = 'localhost', 
          port: int = 2000,
+         control: str = 'auto',
          log_level: int = logging.DEBUG):
 
     with CarlaContext(host=host, port=port, log_level=log_level) as cc, ManualExecutor(cc, fixed_delta_seconds=1/fps) as exe:
         cc.reload_world(map_name=map)
         
+        # 地图一共92个生成点
         ego_vehicle: Vehicle = (cc.actor_factory
             .create(Vehicle, from_blueprint='vehicle.tesla.model3')
             .with_name("ego_vehicle")
-            .with_transform(cc.get_spawn_point(0))
+            .with_transform(cc.get_spawn_point(37))
             .build())
+        if control == 'manual':
+            exe.wait_sim_seconds(15)
         
         cam_front: RgbCamera = (cc.actor_factory
             .create(RgbCamera)
@@ -89,11 +94,7 @@ def main(*,
             
         cc.all_actors_spawn().all_sensors_listen()
         exe.wait_ticks(1)
-        
-        ego_vehicle.set_autopilot(True)
-        exe.wait_ticks(1)
-        exe.wait_sim_seconds(1)
-        
+
         # SETUP DUMPER
         dumper = NuScenesLidarsegDumper(output, fps)
         dumper.bind_camera(cam_front, channel="CAM_FRONT")
@@ -105,26 +106,43 @@ def main(*,
         dumper.bind_semantic_lidar(semantic_lidar, channel="LIDAR_TOP")
         dumper.bind_vehicle(ego_vehicle)
 
+        frame_num = 100
+        if control == 'auto':
+            ego_vehicle.set_autopilot(True)
+        elif control == 'manual':
+            dumper.logger.debug("Start manual control...")
+        elif control == 'replay':
+            waypoints_path = 'tf.npy'
+            waypoints = Waypoints.from_file(file_path=waypoints_path, delta_seconds=1.0 / fps, forward=True, keep_last=False)
+            waypoints_iter = iter(waypoints)
+            ego_vehicle.set_physics(False)
+            frame_num = len(waypoints)
+        exe.wait_ticks(1)
+        exe.wait_sim_seconds(1)
+
         # EXEC DUMP
         with dumper.create_sequence('v1.0-demo'):
-            for i in range(3):
+            for i in range(frame_num):
                 dumper.logger.debug(f'-> FRAME: {dumper.current_frame_name} '.ljust(80, '-'))
-                exe.wait_ticks(1)
+                if control == 'replay':
+                    ego_vehicle.set_transform(next(waypoints_iter).as_carla_transform_obj())
+                exe.wait_ticks(1)    
                 dumper.create_frame().join()
-
+                    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--fps', type=int, default=20, help='Recommended FPS of the simulation')
-    parser.add_argument('--map', type=str, default='Town01', help='Name of the map to load')
+    parser.add_argument('--map', type=str, default='SUSTech_COE_ParkingLot', help='Name of the map to load')
     parser.add_argument('--output', type=str, default='./temp/', help='Path to save the dataset')
     parser.add_argument('--host', type=str, default='localhost', help='Host of the Carla server')
     parser.add_argument('--port', type=int, default=2000, help='Port of the Carla server')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, setting log level to DEBUG')
+    parser.add_argument('--control', type=str, default='auto', help='Way to control ego vehicle')
     args = parser.parse_args()
     
     log_level = logging.DEBUG if args.debug else logging.INFO
     
     try:
-        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, log_level=log_level)
+        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, control=args.control, log_level=log_level)
     except Exception:
         print(f'Exception occurred, check the log for more details.')
