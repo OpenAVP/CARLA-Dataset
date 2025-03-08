@@ -34,21 +34,17 @@ def merge_temp_directories(version, json_dir, temp_dir, target_dir, required_sam
     trainval_scenes = splits.trainval
     test_scenes = splits.test
     mini_scenes = splits.mini
-    # print("mini scenes:",mini_scenes)
-    # json_dst = os.path.join(target_dir, version)
+
     trainval_dst = os.path.join(target_dir, json_dir[0])
     test_dst = os.path.join(target_dir, json_dir[1])
     mini_dst = os.path.join(target_dir, json_dir[2])
 
-    # print(target_dir, json_dir, os.path.join(target_dir, json_dir[0]))
     os.makedirs(os.path.join(target_dir, json_dir[0]), exist_ok=True)
     os.makedirs(os.path.join(target_dir, json_dir[1]), exist_ok=True)
     os.makedirs(os.path.join(target_dir, json_dir[2]), exist_ok=True)
-    # print("os.path.join(target_dir, json_dir[0]):",os.path.join(target_dir, json_dir[0]))
 
     # 初始化 tqdm 进度条
     for subdir in tqdm(subdirs, desc="Processing directories", unit="dir"):
-        # print("subdir:",subdir)
         src_path = os.path.join(temp_dir, subdir)
         
         # 1. 复制 can_bus 目录中的所有 JSON 文件
