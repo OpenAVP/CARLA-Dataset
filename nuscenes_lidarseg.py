@@ -8,24 +8,27 @@ from packages.carla1s.utils.waypoint import Waypoints
 
 from src.nuscenes import NuScenesLidarsegDumper
 
+import sustech_coe_parkinglot_enhancement
 
-def main(*, 
-         fps: int = 20, 
-         map: str = 'Town10', 
-         output: str = './temp/', 
-         host: str = 'localhost', 
+def main(*,
+         fps: int = 20,
+         map: str = 'SUSTech_COE_ParkingLot',
+         output: str = './temp/',
+         host: str = 'localhost',
          port: int = 2000,
+         point_num: int = 0,
          control: str = 'auto',
+         create_vehicle: bool = False,
          log_level: int = logging.DEBUG):
 
     with CarlaContext(host=host, port=port, log_level=log_level) as cc, ManualExecutor(cc, fixed_delta_seconds=1/fps) as exe:
-        cc.reload_world(map_name=map)
+        cc.reload_world(map_name=map,reset_actor_list=False)
         
         # 地图一共92个生成点
         ego_vehicle: Vehicle = (cc.actor_factory
             .create(Vehicle, from_blueprint='vehicle.tesla.model3')
             .with_name("ego_vehicle")
-            .with_transform(cc.get_spawn_point(37))
+            .with_transform(cc.get_spawn_point(point_num))
             .build())
         if control == 'manual':
             exe.wait_sim_seconds(15)
@@ -106,6 +109,14 @@ def main(*,
         dumper.bind_semantic_lidar(semantic_lidar, channel="LIDAR_TOP")
         dumper.bind_vehicle(ego_vehicle)
 
+	actors = []
+        vehicles = []
+        if create_vehicle:
+            print("Start add vehicles...")
+            actors, vehicles = sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
+            print("Finish add vehicles...")
+
+	# scene 帧数
         frame_num = 100
         if control == 'auto':
             ego_vehicle.set_autopilot(True)
@@ -131,18 +142,20 @@ def main(*,
                     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fps', type=int, default=20, help='Recommended FPS of the simulation')
+    parser.add_argument('--fps', type=int, default=2, help='Recommended FPS of the simulation')
     parser.add_argument('--map', type=str, default='SUSTech_COE_ParkingLot', help='Name of the map to load')
     parser.add_argument('--output', type=str, default='./temp/', help='Path to save the dataset')
     parser.add_argument('--host', type=str, default='localhost', help='Host of the Carla server')
+    parser.add_argument('--point_num', type=int, default=57, help='Spawn point of ego vehicle')
     parser.add_argument('--port', type=int, default=2000, help='Port of the Carla server')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, setting log level to DEBUG')
     parser.add_argument('--control', type=str, default='auto', help='Way to control ego vehicle')
+    parser.add_argument('--create_vehicle', type=bool, default=True, help='Way to control ego vehicle')
     args = parser.parse_args()
-    
+
     log_level = logging.DEBUG if args.debug else logging.INFO
     
     try:
-        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, control=args.control, log_level=log_level)
+        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, point_num=args.point_num, control=args.control, create_vehicle=args.create_vehicle, log_level=log_level)
     except Exception:
         print(f'Exception occurred, check the log for more details.')

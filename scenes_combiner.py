@@ -57,7 +57,8 @@ def merge_temp_directories(version, json_dir, temp_dir, target_dir, required_sam
                 shutil.copy(os.path.join(can_bus_src, file), can_bus_dst)
 
         # 2. 复制 lidarseg 目录下的所有 bin 文件
-        lidarseg_dst_ = ''
+        lidarseg_dst = ''
+        lidarseg_dst_ = ''  # mini部分的额外复制路径
         lidarseg_src = os.path.join(src_path, 'lidarseg', subdir)
         if subdir in trainval_scenes:
             lidarseg_dst = os.path.join(target_dir, 'lidarseg', json_dir[0])
@@ -65,12 +66,14 @@ def merge_temp_directories(version, json_dir, temp_dir, target_dir, required_sam
             lidarseg_dst = os.path.join(target_dir, 'lidarseg', json_dir[1])
         if subdir in mini_scenes:
             lidarseg_dst_ = os.path.join(target_dir, 'lidarseg', json_dir[2])
-        if not os.path.exists(lidarseg_dst):
+        if not lidarseg_dst == '' and not os.path.exists(lidarseg_dst):
             os.makedirs(lidarseg_dst)
         if not lidarseg_dst_ == '' and not os.path.exists(lidarseg_dst_):
             os.makedirs(lidarseg_dst_)
         for file in os.listdir(lidarseg_src):
             if file.endswith('.bin'):
+                if os.path.join(lidarseg_src, file) == '' or lidarseg_dst == '':
+                    print(os.path.join(lidarseg_src, file),"|||",lidarseg_dst)
                 shutil.copy(os.path.join(lidarseg_src, file), lidarseg_dst)
         if not lidarseg_dst_ == '':
             for file in os.listdir(lidarseg_src):
@@ -139,7 +142,11 @@ def merge_temp_directories(version, json_dir, temp_dir, target_dir, required_sam
                     shutil.copy(os.path.join(scene_path, file), test_dst)
                     shutil.copy(os.path.join(scene_path, file), mini_dst)
             copy_flag = False
-        
+       
+        lidarseg_dst_ = os.path.join(target_dir, 'lidarseg', json_dir[2])
+        if not lidarseg_dst_ == '' and not os.path.exists(lidarseg_dst_):
+            os.makedirs(lidarseg_dst_)
+
     # 将合并后的 JSON 数据写入目标文件  
     for file_name in required_json_files:
         path_file_name = os.path.join(trainval_dst, file_name)

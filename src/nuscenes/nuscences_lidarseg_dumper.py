@@ -2,6 +2,7 @@ import logging
 import math
 
 import carla
+import math
 import json
 import os
 import numpy as np
@@ -20,7 +21,7 @@ from ..dataset_dumper import DatasetDumper
 from .nuscences_db import NuScenesDB
 
 def safe_value(value, default=0.0):
-        #如果数据中出现nan，则替换为0
+        #如果数据中出现nan，则替换为默认值
         if value is None or math.isnan(value) or math.isinf(value):
             return default
         return value
@@ -191,13 +192,8 @@ class NuScenesLidarsegDumper(DatasetDumper):
                             .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
         tf.matrix[:3, :3]=RT.data.matrix[:3, :3]
 
-        
         self._previous_yaw = np.deg2rad(self._yaw)
         self._yaw = np.deg2rad(tf.yaw)
-        
-        # TO DO:
-        # 存储自车信息，保存canbus数据
-
 
         # 并行处理传感器数据
         for bind in self.binds:
@@ -406,9 +402,6 @@ class NuScenesLidarsegDumper(DatasetDumper):
             )
         self.logger.debug(f"Created '{bind.channel}' lidarseg record with token: '{token}'")
 
-
-    
-    
     def _dump_instance_with_annotation(self, bind: SemanticLidarBind, vehicle_bind: VehicleBind):
         # 阻塞等待传感器更新
         bind.actor.on_data_ready.wait()
@@ -421,16 +414,17 @@ class NuScenesLidarsegDumper(DatasetDumper):
             radar_count: int = 0
             translation = [1.0, 1.0, 1.0]
             size = [1.0, 1.0, 1.0]
-            rotation = [1.0, 1.0, 1.0, 1.0]
-        
+            rotation = [1.0, 0.0, 0.0, 0.0]
+
         infos: Dict[int, ObjectInfo] = dict()
         
         # 解析点云数据, 聚类每个 objectId , semanticId 及其出现的次数
         vehicle_id = vehicle_bind.actor.entity.id if vehicle_bind and vehicle_bind.actor else None
         cloud = bind.actor.data.content
+
         for row in cloud:
-            object_id = int(row[3])
-            semantic_id = int(row[4])
+            semantic_id = int(row[3])
+            object_id = int(row[4])
             
             # 重新映射 semantic_id, 并考虑 ego vehicle 的特殊标签
             semantic_id = self.MAPPING_SEG_CARLA_TO_NUSCENES.get(semantic_id, self.MAPPING_SEG_NUSCENES_DEFAULT)
@@ -457,20 +451,21 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 continue
             # 否则更新聚类结果
             bb = actor.bounding_box
+	    # 清除传感器等无BoundingBox的actor
+            if np.isnan(bb.location.x) or np.isnan(bb.rotation.yaw) or np.isnan(bb.extent.x) or np.isinf(bb.location.x) or np.isinf(bb.rotation.yaw) or np.isinf(bb.extent.x):
+                continue
             bb_tf = Transform(x=bb.location.x, y=bb.location.y, z=bb.location.z, yaw=bb.rotation.yaw, pitch=bb.rotation.pitch, roll=bb.rotation.roll)
             info = infos[actor.id]
             # info.translation = [bb.location.x, bb.location.y, bb.location.z]
             # info.size = [bb.extent.x, bb.extent.y, bb.extent.z]
-            info.translation = [safe_value(bb.location.x), safe_value(bb.location.y), safe_value(bb.location.z)]
-            info.size = [safe_value(bb.extent.x), safe_value(bb.extent.y), safe_value(bb.extent.z)]
+            info.translation = [safe_value(bb.location.x, 0.0), safe_value(bb.location.y, 0.0), safe_value(bb.location.z, 0.0)]
+            info.size = [safe_value(bb.extent.x, 1.0), safe_value(bb.extent.y, 1.0), safe_value(bb.extent.z, 1.0)]
             info.rotation = bb_tf.quaternion.tolist()
             self.logger.debug(f"Actor {actor.id}: Translation {bb.location}, Size {bb.extent}, Rotation {bb.rotation}")
 
         # 打印聚类结果日志
         self.logger.debug(f"Annotated {len(infos)} instances with MAPPING_SEG_CARLA_TO_NUSCENES filter.")
 
-        # 确定 instance 
-        prev_annotation_token = None
         for info in infos.values():
             # TODO: 需确定是否需要该忽略
             # 忽略标签为 MAPPING_SEG_NUSCENES_DEFAULT 0 - noise 的实例
@@ -483,6 +478,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
             token_instance = None
             
             # 如果 object_id 在当前序列中未知, 则创建一个新的 instance 记录, 并更新当前序列已知对象字典
+            token_instance = None
             if info.object_id not in self._current_sequence_known_objects:
                 with self._lock_db:
                     token_instance = self._db.add_instance(
@@ -492,7 +488,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 self._current_sequence_known_objects[info.object_id] = token_instance
                 self.logger.debug(f"Created '{bind.channel}' instance record with token: '{token_instance}' for object_id: {info.object_id}")
             else:
-                token_instance = self._current_sequence_known_objects[info.object_id]
+                token_instance = self._current_sequence_known_objects[info.object_id] # object_id: instance_token
                 
             # 更新 instance 与 annotation 表
             with self._lock_db:
@@ -500,7 +496,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                     token=token_instance,
                     last_annotation_token=token_annotation
                 )
-                prev_annotation_token = self._db.add_sample_annotation(
+                self._db.add_sample_annotation(
                     token=token_annotation,
                     sample_token=self._token_current_sample,
                     instance_token=token_instance,

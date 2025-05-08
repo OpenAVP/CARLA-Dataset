@@ -27,7 +27,7 @@ class NuScenesDB:
     def _create_database(self) -> Tuple[sqlite3.Connection, sqlite3.Cursor]:
         # 如果文件已经存在则抛出异常
         if os.path.exists(self._db_path):
-            # TODO: 删除文件是临时解决方案
+            # 删除文件是临时解决方案
             os.remove(self._db_path)
             # raise FileExistsError(f"File {self._db_path} already exists")
         
@@ -602,7 +602,7 @@ class NuScenesDB:
             rotation (list[float]): 旋转矩阵
             num_lidar_pts (int): 激光雷达点数
             num_radar_pts (int): 雷达点数
-            prev (str, optional): 前一个 sample_annotation 记录的 token, 默认为 None
+            prev (str, optional): 该 instance 的前一个 token 记录, 默认为 None
 
         Returns:
             str: 插入数据库的 token
@@ -613,6 +613,13 @@ class NuScenesDB:
         size = json.dumps(size)
         rotation = json.dumps(rotation)
         
+	# 查找 prev
+        self._cursor.execute('''
+            SELECT last_annotation_token FROM instance WHERE token = ?
+        ''',(instance_token, ))
+        result = self._cursor.fetchall()
+        prev = result[0] if result else None
+
         # 记录新值
         self._cursor.execute('''
             INSERT INTO sample_annotation (token, sample_token, visibility_token, attribute_tokens, instance_token, translation, size, rotation, num_lidar_pts, num_radar_pts, prev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
