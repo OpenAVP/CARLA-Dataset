@@ -80,7 +80,7 @@ def main(*,
             .with_attributes(image_size_x=1600, image_size_y=900, fov=70)
             .with_parent(ego_vehicle)
             .build())
-        
+
         semantic_lidar: SemanticLidar = (cc.actor_factory
             .create(SemanticLidar)
             .with_name("sem_lidar")
@@ -94,7 +94,7 @@ def main(*,
                              lower_fov=-30,
                              )
             .build())
-            
+
         cc.all_actors_spawn().all_sensors_listen()
         exe.wait_ticks(1)
 
@@ -109,7 +109,7 @@ def main(*,
         dumper.bind_semantic_lidar(semantic_lidar, channel="LIDAR_TOP")
         dumper.bind_vehicle(ego_vehicle)
 
-	actors = []
+        actors = []
         vehicles = []
         if create_vehicle:
             print("Start add vehicles...")
@@ -117,7 +117,7 @@ def main(*,
             print("Finish add vehicles...")
 
 	# scene 帧数
-        frame_num = 100
+        frame_num = 30
         if control == 'auto':
             ego_vehicle.set_autopilot(True)
         elif control == 'manual':

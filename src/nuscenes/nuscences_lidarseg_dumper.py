@@ -456,8 +456,6 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 continue
             bb_tf = Transform(x=bb.location.x, y=bb.location.y, z=bb.location.z, yaw=bb.rotation.yaw, pitch=bb.rotation.pitch, roll=bb.rotation.roll)
             info = infos[actor.id]
-            # info.translation = [bb.location.x, bb.location.y, bb.location.z]
-            # info.size = [bb.extent.x, bb.extent.y, bb.extent.z]
             info.translation = [safe_value(bb.location.x, 0.0), safe_value(bb.location.y, 0.0), safe_value(bb.location.z, 0.0)]
             info.size = [safe_value(bb.extent.x, 1.0), safe_value(bb.extent.y, 1.0), safe_value(bb.extent.z, 1.0)]
             info.rotation = bb_tf.quaternion.tolist()
@@ -492,10 +490,6 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 
             # 更新 instance 与 annotation 表
             with self._lock_db:
-                self._db.update_instance(
-                    token=token_instance,
-                    last_annotation_token=token_annotation
-                )
                 self._db.add_sample_annotation(
                     token=token_annotation,
                     sample_token=self._token_current_sample,
@@ -507,7 +501,6 @@ class NuScenesLidarsegDumper(DatasetDumper):
                     rotation=info.rotation,
                     num_lidar_pts=info.lidar_count,
                     num_radar_pts=info.radar_count,
-                    prev=prev_annotation_token
                 )
                 self.logger.debug(f"Created annotation record for object_id: {info.object_id}, token: '{token_annotation}'")
 

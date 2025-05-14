@@ -24,7 +24,7 @@ fi
 # 主循环遍历并执行Python脚本
 current=$start
 while [ "$current" -le "$end" ]; do
-    python nuscenes_lidarseg.py --point_num "$current"
+    python nuscenes_lidarseg.py --point_num "$current" --host "172.17.0.1"
     current=$((current + 1))
 done
 

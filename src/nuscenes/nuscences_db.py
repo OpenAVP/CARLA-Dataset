@@ -572,7 +572,7 @@ class NuScenesDB:
         
         self._cursor.execute('''
             INSERT INTO instance (token, category_token, first_annotation_token, last_annotation_token) VALUES (?, ?, ?, ?)
-        ''', (token, category_token, first_annotation_token, first_annotation_token))
+        ''', (token, category_token, first_annotation_token, ""))
         
         self._conn.commit()
         return token
@@ -602,7 +602,6 @@ class NuScenesDB:
             rotation (list[float]): 旋转矩阵
             num_lidar_pts (int): 激光雷达点数
             num_radar_pts (int): 雷达点数
-            prev (str, optional): 该 instance 的前一个 token 记录, 默认为 None
 
         Returns:
             str: 插入数据库的 token
@@ -612,32 +611,32 @@ class NuScenesDB:
         translation = json.dumps(translation)
         size = json.dumps(size)
         rotation = json.dumps(rotation)
-        
-	# 查找 prev
+
+	# 查找 prev , 该 instance 的前一个 token 记录, 默认为 None
         self._cursor.execute('''
             SELECT last_annotation_token FROM instance WHERE token = ?
         ''',(instance_token, ))
         result = self._cursor.fetchall()
-        prev = result[0] if result else None
+        prev = result[0][0] if result else None
 
         # 记录新值
         self._cursor.execute('''
             INSERT INTO sample_annotation (token, sample_token, visibility_token, attribute_tokens, instance_token, translation, size, rotation, num_lidar_pts, num_radar_pts, prev) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (token, sample_token, visibility_token, attribute_tokens, instance_token, translation, size, rotation, num_lidar_pts, num_radar_pts, prev))
-        
+
         # 更新 instance 表的 last_annotation_token
         self._cursor.execute('''
             UPDATE instance SET last_annotation_token = ? WHERE token = ?
         ''', (token, instance_token))
-        
+
         # 更新前一个 sample_annotation 记录的 next 值
         if prev:
             self._cursor.execute('''
                 UPDATE sample_annotation SET next = ? WHERE token = ?
             ''', (token, prev))
-        
+
         self._conn.commit()
-        return token    
+        return token
     
     def add_lidarseg(self, *,
                      token: str,
