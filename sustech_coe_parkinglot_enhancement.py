@@ -461,8 +461,8 @@ def create_vehicles(client):
     print("get world...")
     actors = []
 
-    num_to_spawn = 120
-    num_of_moving_vehicles = 8  # 控制移动车辆数量
+    num_to_spawn = 150
+    num_of_moving_vehicles = 15  # 控制移动车辆数量
     tm_speed_variation = 30   # 车速变化百分比（正数减速，负数加速）
 
     # Get random sequence of parking spots

@@ -606,13 +606,15 @@ class NuScenesDB:
         Returns:
             str: 插入数据库的 token
         """        
+        # if abs(translation[0]-1) <0.5 or abs(size[0]-1) <0.5:
+        #     print("size:",size," translation:",translation)
         # 转换部分数据为 json 格式
         attribute_tokens = json.dumps(attribute_tokens)
         translation = json.dumps(translation)
         size = json.dumps(size)
         rotation = json.dumps(rotation)
 
-	# 查找 prev , 该 instance 的前一个 token 记录, 默认为 None
+        # 查找 prev , 该 instance 的前一个 token 记录, 默认为 None
         self._cursor.execute('''
             SELECT last_annotation_token FROM instance WHERE token = ?
         ''',(instance_token, ))

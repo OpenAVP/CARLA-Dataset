@@ -102,6 +102,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
         self._token_current_ego_pose: str = None
         self._token_current_sample_data: str = None
         self._token_default_attribute: str = None
+        self._token_vehicle_moving_attribute: str = None
         self._token_default_visibility: str = None
         # SEQUENCE INFO
         self._current_sequence_description: str = sequence_description
@@ -415,6 +416,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
             translation = [1.0, 1.0, 1.0]
             size = [1.0, 1.0, 1.0]
             rotation = [1.0, 0.0, 0.0, 0.0]
+            velocity = [0.0, 0.0]
 
         infos: Dict[int, ObjectInfo] = dict()
         
@@ -426,6 +428,9 @@ class NuScenesLidarsegDumper(DatasetDumper):
             semantic_id = int(row[3])
             object_id = int(row[4])
             
+            if object_id == 0:
+                continue
+
             # 重新映射 semantic_id, 并考虑 ego vehicle 的特殊标签
             semantic_id = self.MAPPING_SEG_CARLA_TO_NUSCENES.get(semantic_id, self.MAPPING_SEG_NUSCENES_DEFAULT)
             if vehicle_id == object_id:
@@ -454,12 +459,23 @@ class NuScenesLidarsegDumper(DatasetDumper):
 	    # 清除传感器等无BoundingBox的actor
             if np.isnan(bb.location.x) or np.isnan(bb.rotation.yaw) or np.isnan(bb.extent.x) or np.isinf(bb.location.x) or np.isinf(bb.rotation.yaw) or np.isinf(bb.extent.x):
                 continue
-            bb_tf = Transform(x=bb.location.x, y=bb.location.y, z=bb.location.z, yaw=bb.rotation.yaw, pitch=bb.rotation.pitch, roll=bb.rotation.roll)
+            # bb_tf = Transform(x=bb.location.x, y=bb.location.y, z=bb.location.z, yaw=bb.rotation.yaw, pitch=bb.rotation.pitch, roll=bb.rotation.roll)
+
+            bb_tf = Transform.from_carla_transform_obj(actor.get_transform())
             info = infos[actor.id]
-            info.translation = [safe_value(bb.location.x, 0.0), safe_value(bb.location.y, 0.0), safe_value(bb.location.z, 0.0)]
+            # info.translation = [safe_value(bb.location.x, 0.0), safe_value(bb.location.y, 0.0), safe_value(bb.location.z, 0.0)]
+            info.translation = [safe_value(bb_tf.x, 0.0), safe_value(bb_tf.y, 0.0), safe_value(bb_tf.z, 0.0)]
             info.size = [safe_value(bb.extent.x, 1.0), safe_value(bb.extent.y, 1.0), safe_value(bb.extent.z, 1.0)]
             info.rotation = bb_tf.quaternion.tolist()
+            info.velocity = [actor.get_velocity().x, actor.get_velocity().y]
             self.logger.debug(f"Actor {actor.id}: Translation {bb.location}, Size {bb.extent}, Rotation {bb.rotation}")
+            # print("location:",actor.get_location())
+            # print("info.translation:",info.translation)
+            # print("bb_tf:",bb_tf)
+            # print("bb_tf.quaternion:",bb_tf.quaternion)
+            # print("info.rotation:",info.rotation,"\n")
+            # if abs(info.translation[0]-1) < 0.5 or abs(info.translation[1]-1) < 0.5 and abs(info.size[2] - 1) < 0.5:
+            # print("actor:",actor," actor_trasform:",actor.get_transform()," info:",info)
 
         # 打印聚类结果日志
         self.logger.debug(f"Annotated {len(infos)} instances with MAPPING_SEG_CARLA_TO_NUSCENES filter.")
@@ -488,13 +504,22 @@ class NuScenesLidarsegDumper(DatasetDumper):
             else:
                 token_instance = self._current_sequence_known_objects[info.object_id] # object_id: instance_token
                 
+            attribute = ""
+            if info.velocity[0] != 0 or info.velocity[1] != 0:
+                attribute = [self._token_default_attribute]
+            else:
+                attribute = [self._token_vehicle_moving_attribute]
+
             # 更新 instance 与 annotation 表
             with self._lock_db:
+                # if abs(info.translation[0]-1) <0.5 or abs(info.size[0]-1) <0.5:
+                    # print("size:",info.size," translation:",info.translation," id:",info.object_id)
+                    # print("actor: ",world.get_actor(info.object_id))
                 self._db.add_sample_annotation(
                     token=token_annotation,
                     sample_token=self._token_current_sample,
                     instance_token=token_instance,
-                    attribute_tokens=[self._token_default_attribute],
+                    attribute_tokens=attribute,
                     visibility_token=self._token_default_visibility,
                     translation=info.translation,
                     size=info.size,
@@ -622,7 +647,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
 
     def _setup_db_attribute(self):
         """填充 attribute 表."""
-        self._db.add_attribute(name="vehicle.moving", description="Vehicle is moving.")
+        self._token_vehicle_moving_attribute = self._db.add_attribute(name="vehicle.moving", description="Vehicle is moving.")
         self._db.add_attribute(name="vehicle.stopped", description="Vehicle, with a driver/rider in/on it, is currently stationary but has an intent to move.")
         self._db.add_attribute(name="vehicle.parked", description="Vehicle is stationary (usually for longer duration) with no immediate intent to move.")
         self._db.add_attribute(name="cycle.with_rider", description="There is a rider on the bicycle or motorcycle.")

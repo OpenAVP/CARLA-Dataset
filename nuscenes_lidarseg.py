@@ -117,7 +117,7 @@ def main(*,
             print("Finish add vehicles...")
 
 	# scene 帧数
-        frame_num = 30
+        frame_num = 100
         if control == 'auto':
             ego_vehicle.set_autopilot(True)
         elif control == 'manual':
