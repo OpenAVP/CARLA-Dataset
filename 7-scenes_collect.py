@@ -19,7 +19,7 @@ def setup_carla(map_name):
     client.set_timeout(5.0)                 # 设置超时时间
     world = client.get_world()
     
-    # 2. 加载指定地图（替换为实际地图名称）
+    # 2. 加载指定地图
     world = client.load_world(map_name)        # 示例地图
     settings = world.get_settings()
     settings.synchronous_mode = True           # 启用同步模式
