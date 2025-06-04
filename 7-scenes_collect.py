@@ -102,7 +102,7 @@ def main_loop(client, world, ego_vehicle, camera_manager, frame_limit = 0):
             pose_matrix = ego_vehicle.get_transform().get_matrix()
             camera_manager.pose_queue.put(np.array(pose_matrix.copy()))
             
-            # 保存数据（示例保存逻辑）
+            # 保存数据
             save_data_frame(
                 frame_count,
                 camera_manager.rgb_queue,
