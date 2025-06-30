@@ -16,10 +16,8 @@ from queue import Queue
 
 def setup_carla(map_name):
     client = carla.Client('172.17.0.1', 2000)  # 连接Carla服务器
-    client.set_timeout(5.0)                 # 设置超时时间
-    world = client.get_world()
-    
-    # 2. 加载指定地图
+
+    client.set_timeout(3.0)                 # 设置超时时间
     world = client.load_world(map_name)        # 示例地图
     settings = world.get_settings()
     settings.synchronous_mode = True           # 启用同步模式
@@ -81,13 +79,109 @@ class CameraManager:
     def _rgb_callback(self, image):
         array = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
         array = array[:, :, :3]  # 去除Alpha通道
+        # array = array[:, :, ::-1]
         self.rgb_queue.put(array.copy())
+        # self.rgb_queue.put(image)
 
     def _depth_callback(self, image):
+        # array = np.reshape(np.copy(image.raw_data), (image.height, image.width))
+        # array = (array * 0.001).astype(np.float16)  # 转换为米
+        # self.depth_queue.put(array.copy())
         self.depth_queue.put(image)
 
 # ======================
-# 5. 主循环与数据采集
+# 5. 坐标转换工具
+# ======================
+
+def create_transformation_matrix(location, rotation):
+
+    """
+
+    根据位置和旋转生成4x4齐次变换矩阵
+    参数：
+        position: 包含x/y/z的元组 (单位：米)
+        rotation: 包含pitch/yaw/roll的元组 (单位：度数)
+    返回：
+        4x4的numpy数组表示的变换矩阵
+    """
+    x = location.x
+    y = location.y
+    z = location.z
+    pitch = rotation.pitch
+    yaw = rotation.yaw
+    roll = rotation.roll
+    # 将角度转换为弧度
+    pitch_rad = math.radians(pitch)
+    yaw_rad = math.radians(yaw)
+    roll_rad = math.radians(roll)
+
+    # 定义基础旋转矩阵
+    def rotation_matrix_x(angle):
+        return [
+            [1, 0, 0],
+            [0, math.cos(angle), -math.sin(angle)],
+            [0, math.sin(angle), math.cos(angle)]
+        ]
+
+    def rotation_matrix_y(angle):
+        return [
+            [math.cos(angle), 0, math.sin(angle)],
+            [0, 1, 0],
+            [-math.sin(angle), 0, math.cos(angle)]
+        ]
+
+    def rotation_matrix_z(angle):
+        return [
+            [math.cos(angle), -math.sin(angle), 0],
+            [math.sin(angle), math.cos(angle), 0],
+            [0, 0, 1]
+        ]
+
+    # 按照ZYX顺序组合旋转矩阵（对应yaw->pitch->roll）
+    Rz = rotation_matrix_z(roll_rad)
+    Ry = rotation_matrix_y(yaw_rad)
+    Rx = rotation_matrix_x(pitch_rad)
+
+    # 矩阵乘法：总旋转矩阵 = Rz * Ry * Rx
+    R = multiply_matrices(Rz, multiply_matrices(Ry, Rx))
+
+    # 构建齐次变换矩阵
+    matrix = [
+        [R[0][0], R[0][1], R[0][2], x],
+        [R[1][0], R[1][1], R[1][2], y],
+        [R[2][0], R[2][1], R[2][2], z],
+        [0, 0, 0, 1]
+    ]
+    return matrix
+
+def multiply_matrices(a, b):
+    """3x3矩阵乘法"""
+    return [
+        [
+            a[0][0]*b[0][0] + a[0][1]*b[1][0] + a[0][2]*b[2][0],
+            a[0][0]*b[0][1] + a[0][1]*b[1][1] + a[0][2]*b[2][1],
+            a[0][0]*b[0][2] + a[0][1]*b[1][2] + a[0][2]*b[2][2]
+        ],
+        [
+            a[1][0]*b[0][0] + a[1][1]*b[1][0] + a[1][2]*b[2][0],
+            a[1][0]*b[0][1] + a[1][1]*b[1][1] + a[1][2]*b[2][1],
+            a[1][0]*b[0][2] + a[1][1]*b[1][2] + a[1][2]*b[2][2]
+        ],
+        [
+            a[2][0]*b[0][0] + a[2][1]*b[1][0] + a[2][2]*b[2][0],
+            a[2][0]*b[0][1] + a[2][1]*b[1][1] + a[2][2]*b[2][1],
+            a[2][0]*b[0][2] + a[2][1]*b[1][2] + a[2][2]*b[2][2]
+        ]
+    ]
+
+def get_transform_matrix(transform):
+    """将carla.Transform转换为4x4 numpy矩阵"""
+    matrix = create_transformation_matrix(transform.location, transform.rotation)
+    return matrix
+
+# ======================
+# 6. 主循环与数据采集
+>>>>>>> c04b342 (FIX:fix problems)
 # ======================
 
 def main_loop(client, world, ego_vehicle, camera_manager, frame_limit = 0):
@@ -99,10 +193,7 @@ def main_loop(client, world, ego_vehicle, camera_manager, frame_limit = 0):
             world.tick()  # 同步模式必须调用tick
             
             # 获取自车位姿矩阵
-            pose_matrix = ego_vehicle.get_transform().get_matrix()
-            camera_manager.pose_queue.put(np.array(pose_matrix.copy()))
-            
-            # 保存数据
+
             save_data_frame(
                 frame_count,
                 camera_manager.rgb_queue,
@@ -139,9 +230,6 @@ def save_data_frame(frame_id, rgb_q, depth_q, pose_q):
         pose = pose_q.get()
         np.savetxt(f'sustech/seq-01/frame-{frame_id}.pose.txt', np.c_[pose],fmt='%.7e',delimiter='\t')
 
-
-# ======================
-# 6. 采集场景初始化
 # ======================
 
 if __name__ == '__main__':

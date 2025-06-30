@@ -21,8 +21,11 @@ if [ "$start" -gt "$end" ]; then
     exit 1
 fi
 
+python nuscenes_lidarseg.py --point_num "$start" --host "172.17.0.1"
+# python nuscenes_lidarseg.py --point_num "$start" --host "172.17.0.1" --isreload
+
 # 主循环遍历并执行Python脚本
-current=$start
+current=$((start+1))
 while [ "$current" -le "$end" ]; do
     python nuscenes_lidarseg.py --point_num "$current" --host "172.17.0.1"
     current=$((current + 1))

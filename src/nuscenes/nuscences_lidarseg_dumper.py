@@ -569,7 +569,7 @@ class NuScenesLidarsegDumper(DatasetDumper):
                     value = 0.0
                 else:
                     R = v / w
-                    print(v,w,R)
+                    # print(v,w,R)
                     value = np.arctan(L / R)
 
                 vel = vel.tolist()

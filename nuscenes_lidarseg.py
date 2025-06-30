@@ -18,11 +18,14 @@ def main(*,
          port: int = 2000,
          point_num: int = 0,
          control: str = 'auto',
+         file_path: str = 'transform.npy',
          create_vehicle: bool = False,
+         isreload: bool = True,
          log_level: int = logging.DEBUG):
 
     with CarlaContext(host=host, port=port, log_level=log_level) as cc, ManualExecutor(cc, fixed_delta_seconds=1/fps) as exe:
-        cc.reload_world(map_name=map,reset_actor_list=False)
+        # print("reload:",isreload)
+        cc.reload_world(map_name=map, reset_actor_list=False, isreload=isreload)
         
         # 地图一共92个生成点
         ego_vehicle: Vehicle = (cc.actor_factory
@@ -111,25 +114,26 @@ def main(*,
 
         actors = []
         vehicles = []
-        if create_vehicle:
+        if create_vehicle and isreload:
             print("Start add vehicles...")
             actors, vehicles = sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
             print("Finish add vehicles...")
 
 	# scene 帧数
-        frame_num = 100
+        frame_num = 40
         if control == 'auto':
             ego_vehicle.set_autopilot(True)
         elif control == 'manual':
             dumper.logger.debug("Start manual control...")
         elif control == 'replay':
-            waypoints_path = 'tf.npy'
-            waypoints = Waypoints.from_file(file_path=waypoints_path, delta_seconds=1.0 / fps, forward=True, keep_last=False)
+            waypoints = Waypoints.from_file(file_path=file_path, delta_seconds=1.0 / fps, forward=True, keep_last=False)
             waypoints_iter = iter(waypoints)
             ego_vehicle.set_physics(False)
             frame_num = len(waypoints)
         exe.wait_ticks(1)
         exe.wait_sim_seconds(1)
+        if isreload:
+            exe.wait_sim_seconds(1)
 
         # EXEC DUMP
         with dumper.create_sequence('v1.0-demo'):
@@ -150,12 +154,16 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=2000, help='Port of the Carla server')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, setting log level to DEBUG')
     parser.add_argument('--control', type=str, default='auto', help='Way to control ego vehicle')
+    parser.add_argument('--file_path', type=str, default='transform.npy', help='Path of ego vehicle')
     parser.add_argument('--create_vehicle', type=bool, default=True, help='Way to control ego vehicle')
+    parser.add_argument('--isreload', default=False, action="store_true", help='Whether to reload the world')
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     
+    # print("args.reload:",args.isreload)
+
     try:
-        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, point_num=args.point_num, control=args.control, create_vehicle=args.create_vehicle, log_level=log_level)
+        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, point_num=args.point_num, control=args.control, file_path=args.file_path, create_vehicle=args.create_vehicle, isreload=args.isreload, log_level=log_level)
     except Exception:
         print(f'Exception occurred, check the log for more details.')

@@ -462,7 +462,7 @@ def create_vehicles(client):
     actors = []
 
     num_to_spawn = 150
-    num_of_moving_vehicles = 15  # 控制移动车辆数量
+    num_of_moving_vehicles = 20  # 控制移动车辆数量
     tm_speed_variation = 30   # 车速变化百分比（正数减速，负数加速）
 
     # Get random sequence of parking spots
@@ -478,7 +478,7 @@ def create_vehicles(client):
     while len(actors) < num_to_spawn:
         if retry > max_retry:
             spawn_offset += 1
-            print(f'Failed to spawn vehicle (name={parking[spawn_counter].name}), skipping to next parking spot...')
+            # print(f'Failed to spawn vehicle (name={parking[spawn_counter].name}), skipping to next parking spot...')
 
         bp = world.get_blueprint_library().find(random.choice(AVAILABLE_VEHICLE_NAME))
         bp.set_attribute('color', random.choice(bp.get_attribute('color').recommended_values))
@@ -489,9 +489,9 @@ def create_vehicles(client):
             actors.append(vehicle)
             spawn_counter += 1
             retry = 0
-            print(f'Spawned {vehicle.type_id} at {tf}')
+            # print(f'Spawned {vehicle.type_id} at {tf}')
         else:
-            print(f'Failed to spawn vehicle (name={parking[spawn_counter].name}), retrying...')
+            # print(f'Failed to spawn vehicle (name={parking[spawn_counter].name}), retrying...')
             retry += 1
 
     print(f'Spawned {len(actors)} vehicles')
@@ -536,12 +536,12 @@ def create_vehicles(client):
 
                 vehicles.append(vehicle)
                 spawn_count += 1
-                print(f'Spawned moving vehicle {vehicle.type_id} at {transform.location}.')
+                # print(f'Spawned moving vehicle {vehicle.type_id} at {transform.location}.')
             except Exception as e:
-                print(f'Failed to set vehicle: {str(e)}')
+                # print(f'Failed to set vehicle: {str(e)}')
                 vehicle.destroy()
-        else:
-            print(f'Failed to spawn vehicle at {transform.location}.')
+        # else:
+            # print(f'Failed to spawn vehicle at {transform.location}.')
 
     print(f'Created {len(vehicles)} moving vehicles.')
     return actors, vehicles
