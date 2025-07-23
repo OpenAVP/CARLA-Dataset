@@ -137,7 +137,9 @@ train_detect = \
     'v1.0-demo_100','v1.0-demo_101','v1.0-demo_102','v1.0-demo_103','v1.0-demo_104','v1.0-demo_105',
     'v1.0-demo_122','v1.0-demo_123','v1.0-demo_124','v1.0-demo_125','v1.0-demo_126','v1.0-demo_127',
     'v1.0-demo_134','v1.0-demo_135','v1.0-demo_136','v1.0-demo_137','v1.0-demo_138','v1.0-demo_139',
-    'v1.0-demo_156','v1.0-demo_157','v1.0-demo_158']
+    'v1.0-demo_156','v1.0-demo_157','v1.0-demo_158','v1.0-demo_164','v1.0-demo_165','v1.0-demo_166',
+    'v1.0-demo_174','v1.0-demo_175','v1.0-demo_176','v1.0-demo_177','v1.0-demo_178','v1.0-demo_184',
+    'v1.0-demo_186','v1.0-demo_187','v1.0-demo_188']
 
 train_track = \
     ['v1.0-demo_32', 'v1.0-demo_33', 'v1.0-demo_34', 'v1.0-demo_35', 'v1.0-demo_36', 'v1.0-demo_37',
@@ -150,27 +152,31 @@ train_track = \
     'v1.0-demo_116','v1.0-demo_117','v1.0-demo_118','v1.0-demo_119','v1.0-demo_120','v1.0-demo_121',
     'v1.0-demo_128','v1.0-demo_129','v1.0-demo_130','v1.0-demo_131','v1.0-demo_132','v1.0-demo_133',
     'v1.0-demo_140','v1.0-demo_141','v1.0-demo_142','v1.0-demo_143','v1.0-demo_144','v1.0-demo_145',
-    'v1.0-demo_159','v1.0-demo_160']
+    'v1.0-demo_159','v1.0-demo_160','v1.0-demo_161','v1.0-demo_162','v1.0-demo_163','v1.0-demo_167',
+    'v1.0-demo_179','v1.0-demo_180','v1.0-demo_181','v1.0-demo_182','v1.0-demo_183','v1.0-demo_185',
+    'v1.0-demo_189','v1.0-demo_190','v1.0-demo_191']
 
 train = list(sorted(set(train_detect + train_track)))
 
 val = \
     ['v1.0-demo_64', 'v1.0-demo_65', 'v1.0-demo_66', 'v1.0-demo_67', 'v1.0-demo_68', 'v1.0-demo_69',
     'v1.0-demo_70', 'v1.0-demo_71', 'v1.0-demo_72', 'v1.0-demo_73', 'v1.0-demo_74', 'v1.0-demo_75',
-    'v1.0-demo_76','v1.0-demo_146','v1.0-demo_147','v1.0-demo_148','v1.0-demo_149','v1.0-demo_150']
+    'v1.0-demo_76','v1.0-demo_146','v1.0-demo_147','v1.0-demo_148','v1.0-demo_149','v1.0-demo_150',
+    'v1.0-demo_168','v1.0-demo_169','v1.0-demo_170']
     
 trainval = list(sorted(set(train + val)))
 
 test = \
     ['v1.0-demo_77', 'v1.0-demo_78', 'v1.0-demo_79', 'v1.0-demo_80', 'v1.0-demo_81', 'v1.0-demo_82',
     'v1.0-demo_83', 'v1.0-demo_84', 'v1.0-demo_85', 'v1.0-demo_86', 'v1.0-demo_87', 'v1.0-demo_88',
-    'v1.0-demo_89','v1.0-demo_151','v1.0-demo_152','v1.0-demo_153','v1.0-demo_154','v1.0-demo_155']
+    'v1.0-demo_89','v1.0-demo_151','v1.0-demo_152','v1.0-demo_153','v1.0-demo_154','v1.0-demo_155',
+    'v1.0-demo_171','v1.0-demo_172','v1.0-demo_173']
 
 mini_train = \
     ['v1.0-demo_1', 'v1.0-demo_20', 'v1.0-demo_27', 'v1.0-demo_35', 'v1.0-demo_136', 'v1.0-demo_145', 
-    'v1.0-demo_160']
+    'v1.0-demo_160','v1.0-demo_166','v1.0-demo_167','v1.0-demo_177','v1.0-demo_182']
 
 mini_val = \
-    ['v1.0-demo_65', 'v1.0-demo_75', 'v1.0-demo_146']
+    ['v1.0-demo_65', 'v1.0-demo_75', 'v1.0-demo_146','v1.0-demo_170']
 
 mini = list(sorted(set(mini_train + mini_val)))

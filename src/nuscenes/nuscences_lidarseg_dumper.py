@@ -186,12 +186,12 @@ class NuScenesLidarsegDumper(DatasetDumper):
 
         self._previous_frame_ego_pose_translation = self._current_frame_ego_pose_translation
         self._previous_frame_ego_pose_rotation = self._current_frame_ego_pose_rotation
-        self._current_frame_ego_pose_translation = [tf.x, tf.y, tf.z]
-        self._current_frame_ego_pose_rotation = tf.quaternion.tolist()
+        self._current_frame_ego_pose_translation = [tf.x, -tf.y, tf.z]
 
         RT=(Coordinate(tf).change_orientation(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION)
                             .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
         tf.matrix[:3, :3]=RT.data.matrix[:3, :3]
+        self._current_frame_ego_pose_rotation = tf.quaternion.tolist()
 
         self._previous_yaw = np.deg2rad(self._yaw)
         self._yaw = np.deg2rad(tf.yaw)
@@ -464,9 +464,15 @@ class NuScenesLidarsegDumper(DatasetDumper):
             bb_tf = Transform.from_carla_transform_obj(actor.get_transform())
             info = infos[actor.id]
             # info.translation = [safe_value(bb.location.x, 0.0), safe_value(bb.location.y, 0.0), safe_value(bb.location.z, 0.0)]
-            info.translation = [safe_value(bb_tf.x, 0.0), safe_value(bb_tf.y, 0.0), safe_value(bb_tf.z, 0.0)]
-            info.size = [safe_value(bb.extent.x, 1.0), safe_value(bb.extent.y, 1.0), safe_value(bb.extent.z, 1.0)]
+            r = 1600 / 900
+            info.translation = [safe_value(bb_tf.x, 0.0), safe_value(-bb_tf.y, 0.0), safe_value(bb_tf.z, 0.0)]
+            info.size = [safe_value(bb.extent.y, 1.0) * 2, safe_value(bb.extent.x, 1.0) * 2, safe_value(bb.extent.z, 1.0) * 2 * r]
+
+            RT=(Coordinate(bb_tf).change_orientation(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION)
+                        .apply_transform(CoordConverter.LEFT_HANDED_TO_RIGHT_HANDED_ORIENTATION))
+            bb_tf.matrix[:3, :3]=RT.data.matrix[:3, :3]
             info.rotation = bb_tf.quaternion.tolist()
+
             info.velocity = [actor.get_velocity().x, actor.get_velocity().y]
             self.logger.debug(f"Actor {actor.id}: Translation {bb.location}, Size {bb.extent}, Rotation {bb.rotation}")
             # print("location:",actor.get_location())
@@ -709,9 +715,11 @@ class NuScenesLidarsegDumper(DatasetDumper):
                 width = int(bind.actor.attributes['image_size_x'])
                 height = int(bind.actor.attributes['image_size_y'])
                 fov = float(bind.actor.attributes['fov'])
-                focal = width / (2.0 * np.tan(fov * np.pi / 360.0))
+                focal_x = width / (2.0 * np.tan(fov * np.pi / 360.0))
+                focal_y = height / (2.0 * np.tan(fov * np.pi / 360.0))
                 intrinsic = np.identity(3)
-                intrinsic[0, 0] = intrinsic[1, 1] = focal
+                intrinsic[0, 0] = focal_x
+                intrinsic[1, 1] = focal_y
                 intrinsic[0, 2] = width / 2.0
                 intrinsic[1, 2] = height / 2.0
                 intrinsic[2, 2] = 1

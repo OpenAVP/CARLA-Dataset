@@ -11,7 +11,7 @@ from src.nuscenes import NuScenesLidarsegDumper
 import sustech_coe_parkinglot_enhancement
 
 def main(*,
-         fps: int = 20,
+         fps: int = 2,
          map: str = 'SUSTech_COE_ParkingLot',
          output: str = './temp/',
          host: str = 'localhost',
@@ -47,7 +47,7 @@ def main(*,
         cam_front_left: RgbCamera = (cc.actor_factory
             .create(RgbCamera)
             .with_name("cam_fl")
-            .with_transform(Transform(x=1.50, y=-0.70, z=2.00, yaw=-55))
+            .with_transform(Transform(x=1.50, y=-0.70, z=2.00, yaw=55))
             .with_attributes(image_size_x=1600, image_size_y=900, fov=70)
             .with_parent(ego_vehicle)
             .build())
@@ -55,7 +55,7 @@ def main(*,
         cam_front_right: RgbCamera = (cc.actor_factory
             .create(RgbCamera)
             .with_name("cam_fr")
-            .with_transform(Transform(x=1.50, y=0.70, z=2.00, yaw=55))
+            .with_transform(Transform(x=1.50, y=0.70, z=2.00, yaw=-55))
             .with_attributes(image_size_x=1600, image_size_y=900, fov=70)
             .with_parent(ego_vehicle)
             .build())
@@ -71,7 +71,7 @@ def main(*,
         cam_back_left: RgbCamera = (cc.actor_factory
             .create(RgbCamera)
             .with_name("cam_bl")
-            .with_transform(Transform(x=-0.70, y=0.70, z=2.00, yaw=-110))
+            .with_transform(Transform(x=-0.70, y=-0.70, z=2.00, yaw=110))
             .with_attributes(image_size_x=1600, image_size_y=900, fov=70)
             .with_parent(ego_vehicle)
             .build())
@@ -79,7 +79,7 @@ def main(*,
         cam_back_right: RgbCamera = (cc.actor_factory
             .create(RgbCamera)
             .with_name("cam_br")
-            .with_transform(Transform(x=-0.70, y=-0.70, z=2.00, yaw=110))
+            .with_transform(Transform(x=-0.70, y=0.70, z=2.00, yaw=-110))
             .with_attributes(image_size_x=1600, image_size_y=900, fov=70)
             .with_parent(ego_vehicle)
             .build())
@@ -90,11 +90,14 @@ def main(*,
             .with_transform(Transform(x=0.00, y=0.00, z=2.0))
             .with_parent(ego_vehicle)
             .with_attributes(rotation_frequency=fps,
-                             points_per_second=140000,
-                             channels=64,
+                             points_per_second=280000,
+                             channels=128,
                              range=80,
                              upper_fov=10,
-                             lower_fov=-30,
+                             lower_fov=-40,
+                            #  dropoff_general_rate=0,
+                            #  dropoff_intensity_limit=0.6,
+                            #  dropoff_zero_intensity=0.2 
                              )
             .build())
 
@@ -104,20 +107,21 @@ def main(*,
         # SETUP DUMPER
         dumper = NuScenesLidarsegDumper(output, fps)
         dumper.bind_camera(cam_front, channel="CAM_FRONT")
-        dumper.bind_camera(cam_front_left, channel="CAM_FRONT_LEFT")
-        dumper.bind_camera(cam_front_right, channel="CAM_FRONT_RIGHT")
+        dumper.bind_camera(cam_front_left, channel="CAM_FRONT_RIGHT")
+        dumper.bind_camera(cam_front_right, channel="CAM_FRONT_LEFT")
         dumper.bind_camera(cam_back, channel="CAM_BACK")
-        dumper.bind_camera(cam_back_left, channel="CAM_BACK_LEFT")
-        dumper.bind_camera(cam_back_right, channel="CAM_BACK_RIGHT")
+        dumper.bind_camera(cam_back_left, channel="CAM_BACK_RIGHT")
+        dumper.bind_camera(cam_back_right, channel="CAM_BACK_LEFT")
         dumper.bind_semantic_lidar(semantic_lidar, channel="LIDAR_TOP")
         dumper.bind_vehicle(ego_vehicle)
 
-        actors = []
-        vehicles = []
-        if create_vehicle and isreload:
-            print("Start add vehicles...")
-            actors, vehicles = sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
-            print("Finish add vehicles...")
+        # actors = []
+        # vehicles = []
+        # if create_vehicle and isreload:
+        #     print("Start add vehicles...")
+        #     actors, vehicles = sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
+        #     print("Finish add vehicles...")
+        sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
 
 	# scene 帧数
         frame_num = 40

@@ -454,16 +454,16 @@ AVAILABLE_VEHICLE_NAME = [
     # 'vehicle.byd.qinpro',  # NO TEST VEHICLE
 ]
 
-def create_vehicles(client):
+def create_vehicles(client, num_to_spawn=200, num_of_moving_vehicles=35, tm_speed_variation=40):
     print("loaded world...")
     world = client.get_world()  # type: carla.World
 
     print("get world...")
     actors = []
 
-    num_to_spawn = 150
-    num_of_moving_vehicles = 20  # 控制移动车辆数量
-    tm_speed_variation = 30   # 车速变化百分比（正数减速，负数加速）
+    num_to_spawn = num_to_spawn
+    num_of_moving_vehicles = num_of_moving_vehicles  # 控制移动车辆数量
+    tm_speed_variation = tm_speed_variation   # 车速变化百分比（正数减速，负数加速）
 
     # Get random sequence of parking spots
     random.shuffle(AVAILABLE_PARKING_AREAS)
