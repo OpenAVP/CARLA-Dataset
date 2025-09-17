@@ -1,5 +1,6 @@
 import logging
 import argparse
+import random
 
 from packages.carla1s import CarlaContext, ManualExecutor
 from packages.carla1s.actors import Vehicle, RgbCamera, SemanticLidar
@@ -21,6 +22,7 @@ def main(*,
          file_path: str = 'transform.npy',
          create_vehicle: bool = False,
          isreload: bool = True,
+         wait_ticks: int = 0,
          log_level: int = logging.DEBUG):
 
     with CarlaContext(host=host, port=port, log_level=log_level) as cc, ManualExecutor(cc, fixed_delta_seconds=1/fps) as exe:
@@ -115,26 +117,23 @@ def main(*,
         dumper.bind_semantic_lidar(semantic_lidar, channel="LIDAR_TOP")
         dumper.bind_vehicle(ego_vehicle)
 
-        # actors = []
-        # vehicles = []
-        # if create_vehicle and isreload:
-        #     print("Start add vehicles...")
-        #     actors, vehicles = sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
-        #     print("Finish add vehicles...")
         sustech_coe_parkinglot_enhancement.create_vehicles(cc.client)
 
-	# scene 帧数
+	    # scene 帧数
         frame_num = 40
         if control == 'auto':
             ego_vehicle.set_autopilot(True)
         elif control == 'manual':
             dumper.logger.debug("Start manual control...")
         elif control == 'replay':
-            waypoints = Waypoints.from_file(file_path=file_path, delta_seconds=1.0 / fps, forward=True, keep_last=False)
+            waypoints = Waypoints.from_file(file_path=file_path, delta_seconds=1.0 / fps, total_frames=40, forward=True, keep_last=False)
             waypoints_iter = iter(waypoints)
             ego_vehicle.set_physics(False)
             frame_num = len(waypoints)
-        exe.wait_ticks(1)
+        if wait_ticks > 0:
+            exe.wait_ticks(wait_ticks)
+        else:
+            exe.wait_ticks(random.randint(5, 30))
         exe.wait_sim_seconds(1)
         if isreload:
             exe.wait_sim_seconds(1)
@@ -158,9 +157,10 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=2000, help='Port of the Carla server')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode, setting log level to DEBUG')
     parser.add_argument('--control', type=str, default='auto', help='Way to control ego vehicle')
-    parser.add_argument('--file_path', type=str, default='transform.npy', help='Path of ego vehicle')
+    parser.add_argument('--file_path', type=str, default='tf1.npy', help='Path of ego vehicle')
     parser.add_argument('--create_vehicle', type=bool, default=True, help='Way to control ego vehicle')
     parser.add_argument('--isreload', default=False, action="store_true", help='Whether to reload the world')
+    parser.add_argument('--wait_ticks', type=int, default=0, help='Ticks to wait before starting collection')
     args = parser.parse_args()
 
     log_level = logging.DEBUG if args.debug else logging.INFO
@@ -168,6 +168,6 @@ if __name__ == "__main__":
     # print("args.reload:",args.isreload)
 
     try:
-        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, point_num=args.point_num, control=args.control, file_path=args.file_path, create_vehicle=args.create_vehicle, isreload=args.isreload, log_level=log_level)
+        main(fps=args.fps, map=args.map, output=args.output, host=args.host, port=args.port, point_num=args.point_num, control=args.control, file_path=args.file_path, create_vehicle=args.create_vehicle, isreload=args.isreload, wait_ticks=args.wait_ticks, log_level=log_level)
     except Exception:
         print(f'Exception occurred, check the log for more details.')

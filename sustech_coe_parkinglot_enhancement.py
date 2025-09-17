@@ -454,7 +454,7 @@ AVAILABLE_VEHICLE_NAME = [
     # 'vehicle.byd.qinpro',  # NO TEST VEHICLE
 ]
 
-def create_vehicles(client, num_to_spawn=200, num_of_moving_vehicles=35, tm_speed_variation=40):
+def create_vehicles(client, num_to_spawn=200, num_of_moving_vehicles=15, tm_speed_variation=30):
     print("loaded world...")
     world = client.get_world()  # type: carla.World
 

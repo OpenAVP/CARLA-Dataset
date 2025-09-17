@@ -21,7 +21,7 @@ if [ "$start" -gt "$end" ]; then
     exit 1
 fi
 
-python nuscenes_lidarseg.py --point_num "$start" --host "172.17.0.1"
+python nuscenes_lidarseg.py --point_num "$start" --host "172.17.0.1" --control "replay"
 # python nuscenes_lidarseg.py --point_num "$start" --host "172.17.0.1" --isreload
 
 # 主循环遍历并执行Python脚本
